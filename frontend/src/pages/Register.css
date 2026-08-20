@@ -1,0 +1,273 @@
+.register-page {
+  min-height: 100vh;
+
+  padding: 40px 20px;
+
+  display: flex;
+
+  justify-content: center;
+
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      #e7f6f7,
+      transparent 45%
+    ),
+    #f7fafb;
+}
+
+
+.register-container {
+  width: 100%;
+
+  max-width: 850px;
+}
+
+
+.register-back {
+  border: none;
+
+  background: transparent;
+
+  color: #71838a;
+
+  font-size: 12px;
+
+  cursor: pointer;
+}
+
+
+.register-header {
+  margin-top: 55px;
+
+  text-align: center;
+}
+
+
+.register-logo {
+  width: 45px;
+  height: 45px;
+
+  margin: 0 auto 20px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 13px;
+
+  background: #087f8c;
+
+  color: white;
+
+  font-size: 20px;
+
+  font-weight: 800;
+}
+
+
+.register-header h1 {
+  margin: 0;
+
+  font-size: 40px;
+
+  line-height: 1.1;
+
+  letter-spacing: -1px;
+}
+
+
+.register-header p {
+  color: #71838a;
+
+  font-size: 14px;
+}
+
+
+.role-grid {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 15px;
+
+  margin-top: 45px;
+}
+
+
+.role-card {
+  position: relative;
+
+  min-height: 170px;
+
+  padding: 25px;
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 17px;
+
+  text-align: left;
+
+  border: 1px solid #dfe9eb;
+
+  border-radius: 15px;
+
+  background: white;
+
+  cursor: pointer;
+}
+
+
+.role-card:hover {
+  border-color: #087f8c;
+}
+
+
+.role-card.selected {
+  border: 2px solid #087f8c;
+
+  background: #f4fbfb;
+}
+
+
+.role-icon {
+  width: 42px;
+  height: 42px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 11px;
+
+  background: #e8f6f7;
+
+  color: #087f8c;
+
+  font-size: 20px;
+}
+
+
+.role-content h3 {
+  margin: 2px 0 7px;
+
+  font-size: 16px;
+}
+
+
+.role-content p {
+  margin: 0;
+
+  color: #78888f;
+
+  font-size: 12px;
+
+  line-height: 1.6;
+}
+
+
+.role-radio {
+  position: absolute;
+
+  top: 18px;
+
+  right: 18px;
+
+  width: 22px;
+
+  height: 22px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border: 1px solid #d4e0e3;
+
+  border-radius: 50%;
+
+  color: white;
+
+  font-size: 11px;
+}
+
+
+.role-card.selected .role-radio {
+  background: #087f8c;
+
+  border-color: #087f8c;
+}
+
+
+.register-continue {
+  width: 100%;
+
+  margin-top: 25px;
+
+  padding: 14px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: #087f8c;
+
+  color: white;
+
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+.register-continue:disabled {
+  background: #cbd8da;
+
+  cursor: not-allowed;
+}
+
+
+.already-account {
+  text-align: center;
+
+  color: #7c8b91;
+
+  font-size: 12px;
+}
+
+
+.already-account button {
+  margin-left: 5px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #087f8c;
+
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+
+@media (max-width: 650px) {
+
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-header h1 {
+    font-size: 32px;
+  }
+
+}
