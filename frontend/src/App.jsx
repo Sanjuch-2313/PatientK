@@ -3,20 +3,51 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
+import PatientSuccess from "./pages/PatientSuccess";
+
+import PatientDashboard from "./pages/PatientDashboard";
+import DoctorDashboard from "./pages/DoctorDashboard";
+import FamilyDashboard from "./pages/FamilyDashboard";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* Main landing page */}
-        <Route path="/" element={<Dashboard />} />
+        <Route
+          path="/"
+          element={<Dashboard />}
+        />
 
-        {/* Registration */}
-        <Route path="/register" element={<Register />} />
+        <Route
+          path="/register"
+          element={<Register />}
+        />
 
-        {/* Login */}
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/patient-success"
+          element={<PatientSuccess />}
+        />
+
+        <Route
+          path="/patient-dashboard"
+          element={<PatientDashboard />}
+        />
+
+        <Route
+          path="/doctor-dashboard"
+          element={<DoctorDashboard />}
+        />
+
+        <Route
+          path="/family-dashboard"
+          element={<FamilyDashboard />}
+        />
 
       </Routes>
     </BrowserRouter>

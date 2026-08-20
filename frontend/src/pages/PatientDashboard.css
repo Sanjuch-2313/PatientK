@@ -1,0 +1,665 @@
+/* =========================================
+   PATIENT DASHBOARD
+========================================= */
+
+.patient-dashboard {
+  min-height: 100vh;
+  display: flex;
+  background: #f5f7f9;
+  color: #17211b;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+
+/* =========================================
+   SIDEBAR
+========================================= */
+
+.patient-sidebar {
+  width: 250px;
+  min-height: 100vh;
+  background: #10261d;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+
+
+.patient-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 35px;
+}
+
+
+.patient-brand-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: #dff5e8;
+  color: #10261d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+
+.patient-brand h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+
+.patient-brand span {
+  color: #91a89c;
+  font-size: 11px;
+  display: block;
+  margin-top: 3px;
+}
+
+
+.patient-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+
+.nav-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #aebdb5;
+  padding: 13px 15px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: 0.25s;
+}
+
+
+.nav-item:hover {
+  background: #19352a;
+  color: white;
+}
+
+
+.nav-item.active {
+  background: #dff5e8;
+  color: #10261d;
+  font-weight: 700;
+}
+
+
+.nav-item span {
+  width: 20px;
+  text-align: center;
+}
+
+
+.sidebar-bottom {
+  margin-top: auto;
+}
+
+
+.logout-button {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #345045;
+  background: transparent;
+  color: #b9c8c0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+
+.logout-button:hover {
+  background: #19352a;
+  color: white;
+}
+
+
+/* =========================================
+   MAIN
+========================================= */
+
+.patient-main {
+  margin-left: 250px;
+  width: calc(100% - 250px);
+  padding: 42px 48px;
+}
+
+
+/* =========================================
+   HEADER
+========================================= */
+
+.patient-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+
+.dashboard-label {
+  color: #6f8378;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin: 0 0 8px;
+}
+
+
+.patient-header h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: -1px;
+}
+
+
+.dashboard-subtitle {
+  color: #75847d;
+  margin: 8px 0 0;
+}
+
+
+.patient-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 10px 16px 10px 10px;
+  border-radius: 14px;
+  border: 1px solid #e3e9e5;
+}
+
+
+.profile-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #dff5e8;
+  color: #163b2b;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 800;
+}
+
+
+.patient-profile strong {
+  display: block;
+  font-size: 14px;
+}
+
+
+.patient-profile span {
+  display: block;
+  color: #7c8b84;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+
+/* =========================================
+   DEVICE STATUS
+========================================= */
+
+.device-status {
+  background: white;
+  border: 1px solid #e3e9e5;
+  border-radius: 16px;
+  padding: 17px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+
+.device-status-left {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+
+.connection-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: #e6f7ed;
+  color: #2b9b5d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+.device-status-left strong {
+  display: block;
+  font-size: 14px;
+}
+
+
+.device-status-left span {
+  display: block;
+  color: #7d8b84;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+
+.connection-status {
+  color: #338458;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #39ad6a;
+  margin-right: 7px;
+}
+
+
+/* =========================================
+   PATIENT ID
+========================================= */
+
+.patient-id-card {
+  background: #16392a;
+  color: white;
+  border-radius: 18px;
+  padding: 22px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 35px;
+}
+
+
+.patient-id-card p {
+  margin: 0 0 7px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #9bb3a7;
+  font-weight: 700;
+}
+
+
+.patient-id-card h2 {
+  margin: 0;
+  font-size: 25px;
+  letter-spacing: 1px;
+}
+
+
+.patient-id-card button {
+  border: 1px solid #648274;
+  background: transparent;
+  color: white;
+  padding: 10px 17px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+
+.patient-id-card button:hover {
+  background: #234b39;
+}
+
+
+/* =========================================
+   SECTION HEADING
+========================================= */
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+
+.section-heading p,
+.info-card-header p {
+  margin: 0 0 5px;
+  color: #819088;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 23px;
+}
+
+
+.live-indicator {
+  color: #32925d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+
+/* =========================================
+   VITALS
+========================================= */
+
+.vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+
+.vital-card {
+  background: white;
+  border: 1px solid #e3e9e5;
+  border-radius: 16px;
+  padding: 20px;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+
+
+.vital-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(20, 45, 33, 0.07);
+}
+
+
+.vital-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+.vital-top > span {
+  color: #78867f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+
+.vital-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+
+.vital-icon.heart {
+  background: #fae8e8;
+  color: #b44d4d;
+}
+
+
+.vital-icon.oxygen {
+  background: #e6f1fa;
+  color: #447da8;
+}
+
+
+.vital-icon.pressure {
+  background: #f3ebdc;
+  color: #98743e;
+}
+
+
+.vital-icon.temperature {
+  background: #f5e7dc;
+  color: #a16a43;
+}
+
+
+.vital-value {
+  margin-top: 22px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+
+.vital-value small {
+  font-size: 12px;
+  color: #7a8881;
+  margin-left: 5px;
+  font-weight: 600;
+}
+
+
+.vital-normal {
+  margin-top: 15px;
+  color: #3d9364;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+
+/* =========================================
+   BOTTOM CARDS
+========================================= */
+
+.patient-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 28px;
+}
+
+
+.info-card {
+  background: white;
+  border: 1px solid #e3e9e5;
+  border-radius: 16px;
+  padding: 22px;
+}
+
+
+.info-card-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+
+.info-card-header h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+
+.info-icon,
+.health-check {
+  width: 35px;
+  height: 35px;
+  border-radius: 10px;
+  background: #edf4ef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #397c59;
+}
+
+
+.last-update {
+  font-size: 28px;
+  font-weight: 800;
+  margin-top: 20px;
+}
+
+
+.health-status {
+  color: #358458;
+  font-size: 28px;
+  font-weight: 800;
+  margin-top: 20px;
+}
+
+
+.info-card > p {
+  color: #89958f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+
+/* =========================================
+   DEMO NOTICE
+========================================= */
+
+.demo-notice {
+  margin-top: 25px;
+  padding: 14px 17px;
+  border: 1px dashed #c9d6ce;
+  border-radius: 12px;
+  background: #f8fbf9;
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: #718079;
+}
+
+
+.demo-notice strong {
+  color: #4e675a;
+}
+
+
+/* =========================================
+   LOADING
+========================================= */
+
+.patient-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7f9;
+  color: #16392a;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 1100px) {
+
+  .vitals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+}
+
+
+@media (max-width: 800px) {
+
+  .patient-sidebar {
+    width: 75px;
+    padding: 20px 10px;
+  }
+
+  .patient-brand > div:last-child,
+  .nav-item:not(.active),
+  .nav-item {
+    font-size: 0;
+  }
+
+  .patient-brand {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .patient-navigation .nav-item {
+    justify-content: center;
+  }
+
+  .patient-navigation .nav-item span {
+    font-size: 18px;
+  }
+
+  .patient-main {
+    margin-left: 75px;
+    width: calc(100% - 75px);
+    padding: 25px;
+  }
+
+  .patient-header {
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .patient-profile {
+    display: none;
+  }
+
+}
+
+
+@media (max-width: 600px) {
+
+  .patient-main {
+    padding: 20px 15px;
+  }
+
+  .patient-header h1 {
+    font-size: 27px;
+  }
+
+  .vitals-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .patient-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .device-status {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .patient-id-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .demo-notice {
+    flex-direction: column;
+  }
+
+}

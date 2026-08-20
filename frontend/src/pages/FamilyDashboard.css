@@ -1,0 +1,335 @@
+.family-dashboard {
+  min-height: 100vh;
+  background: #f5f7f9;
+  color: #17211b;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+
+/* HEADER */
+
+.family-header {
+  height: 72px;
+  background: #10261d;
+  color: white;
+  padding: 0 45px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+
+.family-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+
+.family-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: #dff5e8;
+  color: #10261d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 800;
+  font-size: 21px;
+}
+
+
+.family-brand strong {
+  display: block;
+}
+
+
+.family-brand span {
+  display: block;
+  font-size: 10px;
+  color: #9cb1a7;
+  margin-top: 2px;
+}
+
+
+.family-user {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+}
+
+
+.family-user button {
+  border: 1px solid #466054;
+  background: transparent;
+  color: white;
+  border-radius: 7px;
+  padding: 8px 13px;
+  cursor: pointer;
+}
+
+
+/* MAIN */
+
+.family-main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 60px 30px;
+}
+
+
+/* WELCOME */
+
+.family-welcome {
+  max-width: 680px;
+}
+
+
+.family-welcome p {
+  color: #718279;
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 800;
+}
+
+
+.family-welcome h1 {
+  font-size: 35px;
+  line-height: 1.15;
+  margin: 10px 0;
+}
+
+
+.family-welcome span {
+  color: #7e8b85;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+
+/* SEARCH */
+
+.family-search {
+  background: white;
+  border: 1px solid #e2e9e4;
+  border-radius: 15px;
+  padding: 18px;
+  margin-top: 30px;
+  display: flex;
+  gap: 10px;
+}
+
+
+.family-search input {
+  flex: 1;
+  border: 1px solid #d6dfda;
+  border-radius: 8px;
+  padding: 13px;
+  outline: none;
+}
+
+
+.family-search button {
+  background: #16392a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+.family-search button:disabled {
+  opacity: 0.6;
+}
+
+
+/* ERROR */
+
+.family-error {
+  margin-top: 12px;
+  padding: 11px;
+  border-radius: 8px;
+  background: #fae8e8;
+  color: #a24747;
+  font-size: 12px;
+}
+
+
+/* PATIENT */
+
+.family-patient {
+  margin-top: 30px;
+}
+
+
+.family-patient-title {
+  background: white;
+  border: 1px solid #e2e9e4;
+  border-radius: 15px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+
+.family-patient-title p {
+  margin: 0 0 4px;
+  font-size: 9px;
+  color: #829087;
+  letter-spacing: 1.5px;
+}
+
+
+.family-patient-title h2 {
+  margin: 0;
+}
+
+
+.family-patient-title > span {
+  color: #36845a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+/* VITALS */
+
+.family-vitals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+
+.family-vital {
+  background: white;
+  border: 1px solid #e2e9e4;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+
+.family-vital span {
+  display: block;
+  color: #7d8a83;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+.family-vital strong {
+  display: block;
+  margin-top: 18px;
+  font-size: 27px;
+}
+
+
+.family-vital small {
+  color: #7c8982;
+  font-size: 10px;
+}
+
+
+/* UPDATE */
+
+.family-notice {
+  background: #e9f4ed;
+  color: #3c6950;
+  padding: 15px 18px;
+  border-radius: 12px;
+  margin-top: 15px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+
+/* READ ONLY */
+
+.family-readonly {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f0f2f1;
+  color: #7b8781;
+  font-size: 11px;
+}
+
+
+/* EMPTY */
+
+.family-empty {
+  text-align: center;
+  padding: 80px 20px;
+  color: #7d8983;
+}
+
+
+.family-empty div {
+  width: 60px;
+  height: 60px;
+  margin: auto;
+  border-radius: 17px;
+  background: #dff5e8;
+  color: #183c2c;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 25px;
+}
+
+
+.family-empty h2 {
+  color: #26362d;
+  margin-bottom: 5px;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 800px) {
+
+  .family-header {
+    padding: 0 20px;
+  }
+
+  .family-user span {
+    display: none;
+  }
+
+  .family-main {
+    padding: 40px 18px;
+  }
+
+  .family-vitals {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+}
+
+
+@media (max-width: 550px) {
+
+  .family-search {
+    flex-direction: column;
+  }
+
+  .family-search button {
+    padding: 13px;
+  }
+
+  .family-vitals {
+    grid-template-columns: 1fr;
+  }
+
+  .family-welcome h1 {
+    font-size: 28px;
+  }
+
+}

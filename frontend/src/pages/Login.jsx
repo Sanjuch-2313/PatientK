@@ -7,18 +7,194 @@ function Login() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = (event) => {
+
+  // ==========================================
+  // LOGIN
+  // ==========================================
+
+  const handleLogin = async (event) => {
 
     event.preventDefault();
 
-    console.log("Email:", email);
-    console.log("Password:", password);
+    setError("");
 
-    // Backend authentication will be connected later.
+    if (!email.trim() || !password) {
+      setError(
+        "Please enter your email and password."
+      );
+
+      return;
+    }
+
+    try {
+
+      setLoading(true);
+
+      const response = await fetch(
+        "http://localhost:5005/api/auth/login",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password,
+          }),
+        }
+      );
+
+
+      // ==========================================
+      // CHECK RESPONSE
+      // ==========================================
+
+      const contentType =
+        response.headers.get("content-type");
+
+
+      if (
+        !contentType ||
+        !contentType.includes("application/json")
+      ) {
+
+        throw new Error(
+          "Backend did not return JSON. Check that the Patient K backend is running on port 5005."
+        );
+
+      }
+
+
+      const data = await response.json();
+
+      console.log(
+        "Login response:",
+        data
+      );
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          data.message ||
+            "Invalid email or password."
+        );
+
+      }
+
+
+      // ==========================================
+      // SAVE USER
+      // ==========================================
+
+      if (data.user) {
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data.user)
+        );
+
+        localStorage.setItem(
+          "userId",
+          data.user.id || data.user._id
+        );
+
+        localStorage.setItem(
+          "role",
+          data.user.role
+        );
+
+
+        if (data.user.patientId) {
+
+          localStorage.setItem(
+            "patientId",
+            data.user.patientId
+          );
+
+        }
+
+      }
+
+
+      // ==========================================
+      // REDIRECT
+      // ==========================================
+
+      const userRole =
+        data.user?.role;
+
+
+      /*
+        TEMPORARILY GO TO HOME.
+
+        We haven't created the actual
+        Patient/Doctor/Nurse/Family dashboards yet.
+
+        Once those dashboards are created,
+        we will replace these with their routes.
+      */
+
+      if (userRole === "patient") {
+
+        navigate("/patient-dashboard");
+
+      } else if (userRole === "doctor") {
+
+        navigate("/doctor-dashboard");
+
+      } else if (userRole === "nurse") {
+
+        navigate("/");
+
+      } else if (userRole === "family") {
+
+        navigate("/family-dashboard");
+
+      } else {
+
+        navigate("/");
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Login error:",
+        error
+      );
+
+      setError(
+        error.message ||
+          "Unable to connect to Patient K server."
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
+  // ==========================================
+  // FORGOT PASSWORD
+  // ==========================================
+
+  const handleForgotPassword = () => {
+
+    alert(
+      "Forgot password functionality will be added next."
+    );
+
   };
 
 
@@ -29,7 +205,10 @@ function Login() {
       <div className="login-card">
 
 
+        {/* BACK */}
+
         <button
+          type="button"
           className="login-back"
           onClick={() => navigate("/")}
         >
@@ -37,10 +216,14 @@ function Login() {
         </button>
 
 
+        {/* LOGO */}
+
         <div className="login-logo">
           K
         </div>
 
+
+        {/* HEADER */}
 
         <div className="login-header">
 
@@ -53,36 +236,51 @@ function Login() {
           </h1>
 
           <p>
-            Sign in to continue to your remote care platform.
+            Sign in to continue to your remote
+            care platform.
           </p>
 
         </div>
 
 
+        {/* FORM */}
+
         <form onSubmit={handleLogin}>
 
-          <label>
+
+          {/* EMAIL */}
+
+          <label htmlFor="email">
             Email address
           </label>
 
           <input
+            id="email"
             type="email"
             placeholder="you@example.com"
             value={email}
-            onChange={(event) =>
-              setEmail(event.target.value)
-            }
+            onChange={(event) => {
+
+              setEmail(event.target.value);
+              setError("");
+
+            }}
             required
           />
 
 
+          {/* PASSWORD */}
+
           <div className="password-row">
 
-            <label>
+            <label htmlFor="password">
               Password
             </label>
 
-            <button type="button">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+            >
               Forgot password?
             </button>
 
@@ -90,25 +288,49 @@ function Login() {
 
 
           <input
+            id="password"
             type="password"
             placeholder="Enter your password"
             value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
+            onChange={(event) => {
+
+              setPassword(event.target.value);
+              setError("");
+
+            }}
             required
           />
 
 
+          {/* ERROR */}
+
+          {error && (
+
+            <div className="login-error">
+              {error}
+            </div>
+
+          )}
+
+
+          {/* SUBMIT */}
+
           <button
             className="login-submit"
             type="submit"
+            disabled={loading}
           >
-            Sign In
+
+            {loading
+              ? "Signing in..."
+              : "Sign In"}
+
           </button>
 
         </form>
 
+
+        {/* CREATE ACCOUNT */}
 
         <div className="login-divider">
 
@@ -120,12 +342,15 @@ function Login() {
 
 
         <button
+          type="button"
           className="create-account"
           onClick={() => navigate("/register")}
         >
           Create an account
         </button>
 
+
+        {/* FOOTER */}
 
         <p className="login-footer">
           Patient K — Connected care beyond the hospital.
