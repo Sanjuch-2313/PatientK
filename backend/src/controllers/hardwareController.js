@@ -8,20 +8,53 @@ const fail = (res, status, message) => res.status(status).json({ success: false,
 
 export async function createDevice(req, res) {
   const body = req.body;
+  const allowedKeys = ["deviceId", "name", "patientId", "monitoringPatientId"];
   if (!isBody(body) || !validDeviceId(body.deviceId) || typeof body.name !== "string" ||
       !body.name.trim() || body.name.trim().length > 120 ||
-      Object.keys(body).some((key) => !["deviceId", "name"].includes(key))) {
+      Object.keys(body).some((key) => !allowedKeys.includes(key))) {
     return fail(res, 400, "Provide a valid deviceId and a name of 1–120 characters; only these fields are accepted.");
   }
+  const monitoringPatientId = (body.patientId || body.monitoringPatientId)?.trim() || null;
   try {
     const apiToken = generateHardwareToken();
-    const device = await Device.create({ deviceId: body.deviceId, name: body.name.trim(), apiTokenHash: hashHardwareToken(apiToken) });
+    const device = await Device.create({
+      deviceId: body.deviceId,
+      name: body.name.trim(),
+      monitoringPatientId,
+      apiTokenHash: hashHardwareToken(apiToken),
+    });
     res.set("Cache-Control", "no-store");
-    return res.status(201).json({ success: true, device: { id: device._id, deviceId: device.deviceId, name: device.name }, apiToken });
+    return res.status(201).json({
+      success: true,
+      device: { id: device._id, deviceId: device.deviceId, name: device.name, monitoringPatientId: device.monitoringPatientId },
+      apiToken,
+    });
   } catch (error) {
     if (error.code === 11000 && error.keyPattern?.deviceId) return fail(res, 409, "Device ID already registered.");
     if (error.name === "ValidationError") return fail(res, 400, "Invalid device registration data.");
     return fail(res, 500, "Unable to register device.");
+  }
+}
+
+export async function assignDevice(req, res) {
+  const { deviceId, patientId } = req.body || {};
+  if (!validDeviceId(deviceId) || typeof patientId !== "string" || !patientId.trim()) {
+    return fail(res, 400, "Provide a valid deviceId and patientId.");
+  }
+  try {
+    const device = await Device.findOneAndUpdate(
+      { deviceId },
+      { $set: { monitoringPatientId: patientId.trim() } },
+      { returnDocument: "after" }
+    );
+    if (!device) return fail(res, 404, "Device not found.");
+    return res.json({
+      success: true,
+      message: `Device ${deviceId} assigned to patient ${patientId.trim()}`,
+      device: { deviceId: device.deviceId, name: device.name, monitoringPatientId: device.monitoringPatientId },
+    });
+  } catch (error) {
+    return fail(res, 500, "Unable to assign device.");
   }
 }
 

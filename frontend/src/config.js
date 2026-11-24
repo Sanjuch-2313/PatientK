@@ -1,4 +1,4 @@
-const productionApiUrl = "https://patientk-backend.onrender.com";
+const productionApiUrl = "https://patientk.onrender.com";
 const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const localApiUrl = /^https?:\/\/(localhost|127(?:\.\d{1,3}){3})(?::\d+)?$/i;
 

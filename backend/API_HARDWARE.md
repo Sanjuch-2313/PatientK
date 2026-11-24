@@ -11,7 +11,17 @@ This provisioning route follows the requested interface and currently has no app
 ```sh
 curl -i http://localhost:5005/api/hardware/register \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001"}'
+  -d '{"deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001","patientId":"PAT-2026-0001"}'
+```
+
+Or assign an existing device to a patient at any time:
+
+`POST /api/hardware/assign`
+
+```sh
+curl -i http://localhost:5005/api/hardware/assign \
+  -H 'Content-Type: application/json' \
+  -d '{"deviceId":"PK-DEVICE-001","patientId":"PAT-2026-0001"}'
 ```
 
 HTTP 201 (illustrative token placeholder):
