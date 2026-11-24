@@ -19,4 +19,7 @@ const deviceSchema = new mongoose.Schema({
   toObject: { transform: removeHash },
 });
 
+// Ensure 1-to-1 relationship: only one active ESP32 device per patient
+deviceSchema.index({ monitoringPatientId: 1 }, { unique: true, sparse: true });
+
 export default mongoose.model("Device", deviceSchema);

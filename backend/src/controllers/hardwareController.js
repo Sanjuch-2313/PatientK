@@ -16,6 +16,12 @@ export async function createDevice(req, res) {
   }
   const monitoringPatientId = (body.patientId || body.monitoringPatientId)?.trim() || null;
   try {
+    if (monitoringPatientId) {
+      const existingAssignment = await Device.findOne({ monitoringPatientId });
+      if (existingAssignment) {
+        return fail(res, 409, `Patient ${monitoringPatientId} is already assigned to device ${existingAssignment.deviceId}. Only one ESP32 can be assigned per patient.`);
+      }
+    }
     const apiToken = generateHardwareToken();
     const device = await Device.create({
       deviceId: body.deviceId,
@@ -30,7 +36,10 @@ export async function createDevice(req, res) {
       apiToken,
     });
   } catch (error) {
-    if (error.code === 11000 && error.keyPattern?.deviceId) return fail(res, 409, "Device ID already registered.");
+    if (error.code === 11000) {
+      if (error.keyPattern?.deviceId) return fail(res, 409, "Device ID already registered.");
+      if (error.keyPattern?.monitoringPatientId) return fail(res, 409, "Patient is already assigned to another device.");
+    }
     if (error.name === "ValidationError") return fail(res, 400, "Invalid device registration data.");
     return fail(res, 500, "Unable to register device.");
   }
@@ -41,16 +50,23 @@ export async function assignDevice(req, res) {
   if (!validDeviceId(deviceId) || typeof patientId !== "string" || !patientId.trim()) {
     return fail(res, 400, "Provide a valid deviceId and patientId.");
   }
+  const cleanPatientId = patientId.trim();
   try {
+    // Enforce 1-to-1 relationship: unassign this patient from any other devices first
+    await Device.updateMany(
+      { monitoringPatientId: cleanPatientId, deviceId: { $ne: deviceId } },
+      { $set: { monitoringPatientId: null } }
+    );
+
     const device = await Device.findOneAndUpdate(
       { deviceId },
-      { $set: { monitoringPatientId: patientId.trim() } },
+      { $set: { monitoringPatientId: cleanPatientId } },
       { returnDocument: "after" }
     );
     if (!device) return fail(res, 404, "Device not found.");
     return res.json({
       success: true,
-      message: `Device ${deviceId} assigned to patient ${patientId.trim()}`,
+      message: `Device ${deviceId} exclusively assigned to patient ${cleanPatientId}`,
       device: { deviceId: device.deviceId, name: device.name, monitoringPatientId: device.monitoringPatientId },
     });
   } catch (error) {

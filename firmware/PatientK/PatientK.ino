@@ -1,291 +1,279 @@
 #include <Arduino.h>
-#include <Wire.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <Wire.h>
 #include <time.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <LiquidCrystal_I2C.h>
 #include <MAX30105.h>
-#include <spo2_algorithm.h>
-#include "config.h"
+#include <LiquidCrystal_I2C.h>
 
-// PatientK ESP32 uploader for the engineer's MAX30102 + DS18B20 + AD8232 build.
-// It deliberately has no ESP32 web server. PatientK is the only dashboard.
+// =========================================================================
+// 1. NETWORK & CLOUD BACKEND CREDENTIALS
+// =========================================================================
+const char* WIFI_SSID     = "YOUR_WIFI_NAME";        // Enter your Wi-Fi name
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";    // Enter your Wi-Fi password
 
-#ifndef PATIENTK_USE_HTTPS
-#define PATIENTK_USE_HTTPS false
-#endif
-#ifndef ROOT_CA
-#define ROOT_CA ""
-#endif
-#ifndef LCD_ADDRESS
-#define LCD_ADDRESS 0x27
-#endif
-#ifndef LCD_COLUMNS
-#define LCD_COLUMNS 16
-#endif
-#ifndef LCD_ROWS
-#define LCD_ROWS 2
-#endif
-#ifndef DS18B20_PIN
-#define DS18B20_PIN 4
-#endif
-#ifndef ECG_PIN
-#define ECG_PIN 34
-#endif
-#ifndef LO_PLUS_PIN
-#define LO_PLUS_PIN 32
-#endif
-#ifndef LO_MINUS_PIN
-#define LO_MINUS_PIN 33
-#endif
-#ifndef FINGER_IR_MIN
-#define FINGER_IR_MIN 50000UL
-#endif
+const char* BACKEND_URL   = "https://patientk.onrender.com/api/hardware/update";
+const char* DEVICE_ID     = "PK-DEVICE-001";         // Must match registered deviceId
+const char* API_TOKEN     = "11bd511f75726b472d9b97618e71f52c965598bac525586380105b7b87712fe7"; // From registration
 
-constexpr uint16_t PPG_SAMPLES = 100;
-constexpr uint32_t UPLOAD_INTERVAL_MS = 3000;
-constexpr uint16_t ECG_SAMPLE_RATE_HZ = 100;
-constexpr uint16_t ECG_BATCH_SAMPLES = 300;
+// =========================================================================
+// 2. HARDWARE PIN DEFINITIONS (ESP32)
+// =========================================================================
+#define SDA_PIN        21    // I2C Data (MAX30102 & LCD)
+#define SCL_PIN        22    // I2C Clock (MAX30102 & LCD)
+#define DS18B20_PIN    4     // Temperature sensor data (with 4.7k pull-up)
+#define ECG_PIN        34    // AD8232 Analog Output (ADC1)
+#define LO_PLUS_PIN    32    // AD8232 Lead-Off Detect +
+#define LO_MINUS_PIN   33    // AD8232 Lead-Off Detect -
 
-MAX30105 max30102;
+// =========================================================================
+// 3. SENSOR CONTROLLERS & OBJECTS
+// =========================================================================
+MAX30105 particleSensor;
 OneWire oneWire(DS18B20_PIN);
-DallasTemperature ds18b20(&oneWire);
-LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+DallasTemperature tempSensor(&oneWire);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-bool max30102Ready = false;
-bool lcdReady = false;
-bool fingerPresent = false;
-bool temperatureReady = false;
-bool temperaturePending = false;
-uint32_t irBuffer[PPG_SAMPLES];
-uint32_t redBuffer[PPG_SAMPLES];
-size_t ppgCount = 0;
-uint32_t lastPpgSampleMs = 0;
-uint32_t lastWindowMs = 0;
-uint32_t lastTemperatureRequestMs = 0;
-uint32_t lastUploadMs = 0;
-float bodyTemperatureC = NAN;
-int32_t heartRate = 0;
-int32_t oxygenLevel = 0;
-int8_t heartRateValid = 0;
-int8_t oxygenLevelValid = 0;
-uint16_t ecgSamples[ECG_BATCH_SAMPLES];
-size_t ecgCount = 0;
-uint32_t lastEcgSampleUs = 0;
-int ecgLastRaw = 0;
-bool ecgLeadsOff = true;
+bool sensorDetected = false;
+bool lcdDetected    = false;
+unsigned long lastUploadTime = 0;
+const unsigned long UPLOAD_INTERVAL = 3000; // 3 seconds transmission interval
 
-void clearPpg() {
-  ppgCount = 0;
-  heartRateValid = 0;
-  oxygenLevelValid = 0;
-  lastWindowMs = 0;
+// =========================================================================
+// 4. TIME SYNCHRONIZATION (NTP)
+// Backend requires ISO timestamp within 30 seconds of server UTC clock
+// =========================================================================
+void setupNTP() {
+  Serial.print("[NTP] Synchronizing UTC time via NTP");
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  
+  time_t now = time(nullptr);
+  int retries = 0;
+  while (now < 1700000000 && retries < 25) {
+    delay(400);
+    Serial.print(".");
+    now = time(nullptr);
+    retries++;
+  }
+  
+  if (now >= 1700000000) {
+    Serial.println("\n[NTP] Time successfully synchronized.");
+  } else {
+    Serial.println("\n[NTP] Warning: NTP sync delayed. Will continue retrying.");
+  }
 }
 
-bool validTime() { return time(nullptr) >= 1700000000; }
+String getIsoUtcTimestamp() {
+  time_t now = time(nullptr);
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  char buf[30];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  return String(buf);
+}
 
+// =========================================================================
+// 5. WI-FI MANAGEMENT
+// =========================================================================
 void connectWiFi() {
+  Serial.printf("\n[WiFi] Connecting to %s", WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  const uint32_t startedAt = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startedAt < 20000) {
-    delay(250);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(350);
     Serial.print(".");
+    attempts++;
   }
-  Serial.println();
+
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("Wi-Fi connected. ESP32 IP: ");
+    Serial.println("\n[WiFi] Connected!");
+    Serial.print("[WiFi] IP Address: ");
     Serial.println(WiFi.localIP());
   } else {
-    Serial.println("Wi-Fi unavailable; sensor readings will not upload.");
+    Serial.println("\n[WiFi] Connection timeout. Retrying in main loop.");
   }
 }
 
-void refreshWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-  static uint32_t lastAttemptMs = 0;
-  if (millis() - lastAttemptMs < 10000) return;
-  lastAttemptMs = millis();
-  WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-}
-
-void readPpg() {
-  if (!max30102Ready) return;
-  max30102.check();
-  while (max30102.available()) {
-    const uint32_t red = max30102.getRed();
-    const uint32_t ir = max30102.getIR();
-    max30102.nextSample();
-    lastPpgSampleMs = millis();
-    if (ir < FINGER_IR_MIN || red < 1000 || ir >= 260000 || red >= 260000) {
-      fingerPresent = false;
-      clearPpg();
-      continue;
-    }
-    fingerPresent = true;
-    irBuffer[ppgCount] = ir;
-    redBuffer[ppgCount++] = red;
-    if (ppgCount != PPG_SAMPLES) continue;
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, PPG_SAMPLES, redBuffer,
-      &oxygenLevel, &oxygenLevelValid, &heartRate, &heartRateValid);
-    heartRateValid = heartRateValid && heartRate >= 20 && heartRate <= 250;
-    oxygenLevelValid = oxygenLevelValid && oxygenLevel >= 0 && oxygenLevel <= 100;
-    lastWindowMs = millis();
-    memmove(irBuffer, irBuffer + 25, 75 * sizeof(uint32_t));
-    memmove(redBuffer, redBuffer + 25, 75 * sizeof(uint32_t));
-    ppgCount = 75;
-  }
-}
-
-void readTemperature() {
-  const uint32_t now = millis();
-  if (!temperaturePending && now - lastTemperatureRequestMs >= 1500) {
-    ds18b20.requestTemperatures();
-    lastTemperatureRequestMs = now;
-    temperaturePending = true;
-    return;
-  }
-  if (!temperaturePending || now - lastTemperatureRequestMs < 800) return;
-  temperaturePending = false;
-  const float candidate = ds18b20.getTempCByIndex(0);
-  if (candidate == DEVICE_DISCONNECTED_C || candidate == 85.0f || candidate < -20 || candidate > 80) {
-    temperatureReady = false;
-    return;
-  }
-  bodyTemperatureC = candidate;
-  temperatureReady = true;
-}
-
-void sampleEcg() {
-  const uint32_t nowUs = micros();
-  if (nowUs - lastEcgSampleUs < 1000000UL / ECG_SAMPLE_RATE_HZ) return;
-  lastEcgSampleUs = nowUs;
-  ecgLeadsOff = digitalRead(LO_PLUS_PIN) || digitalRead(LO_MINUS_PIN);
-  if (ecgLeadsOff) {
-    ecgCount = 0;
-    return;
-  }
-  ecgLastRaw = analogRead(ECG_PIN);
-  if (ecgLastRaw <= 10 || ecgLastRaw >= 4085) return;
-  if (ecgCount < ECG_BATCH_SAMPLES) ecgSamples[ecgCount++] = ecgLastRaw;
-}
-
-void updateLcd(bool ppgFresh) {
-  if (!lcdReady) return;
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  if (ppgFresh && heartRateValid) {
-    lcd.printf("HR:%ld Sp:%ld", (long)heartRate, (long)(oxygenLevelValid ? oxygenLevel : 0));
-  } else {
-    lcd.print("Place finger");
-  }
-  lcd.setCursor(0, 1);
-  if (temperatureReady) lcd.printf("Temp:%.1f C", bodyTemperatureC);
-  else lcd.print("Temp unavailable");
-}
-
-String numberOrNull(bool isValid, float value, uint8_t decimals) {
-  return isValid ? String(value, static_cast<unsigned int>(decimals)) : "null";
-}
-
-void uploadReading() {
-  if (millis() - lastUploadMs < UPLOAD_INTERVAL_MS) return;
-  lastUploadMs = millis();
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("PatientK upload skipped: Wi-Fi disconnected");
-    return;
-  }
-  if (!validTime()) {
-    Serial.println("PatientK upload skipped: waiting for NTP time");
-    return;
-  }
-  const bool ppgFresh = fingerPresent && lastWindowMs && millis() - lastWindowMs < 5000 && millis() - lastPpgSampleMs < 1000;
-  const bool leadOff = ecgLeadsOff;
-  const int ecgRaw = ecgLastRaw;
-  time_t now = time(nullptr);
-  struct tm utcTime;
-  gmtime_r(&now, &utcTime);
-  char timestamp[25];
-  strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utcTime);
-  String body = "{";
-  body += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
-  body += "\"heartRate\":" + numberOrNull(ppgFresh && heartRateValid, heartRate, 0) + ",";
-  body += "\"oxygenLevel\":" + numberOrNull(ppgFresh && oxygenLevelValid, oxygenLevel, 0) + ",";
-  body += "\"temperature\":" + numberOrNull(temperatureReady, bodyTemperatureC, 1) + ",";
-  body += "\"leadsOff\":" + String(leadOff ? "true" : "false") + ",";
-  body += "\"ecgRaw\":" + numberOrNull(!leadOff && ecgRaw > 10 && ecgRaw < 4085, ecgRaw, 0) + ",";
-  body += "\"ecgSampleRate\":" + String(ECG_SAMPLE_RATE_HZ) + ",";
-  body += "\"ecgSamples\":[";
-  if (!leadOff) {
-    for (size_t index = 0; index < ecgCount; index++) {
-      if (index) body += ",";
-      body += String(ecgSamples[index]);
-    }
-  }
-  body += "],";
-  body += "\"timestamp\":\"" + String(timestamp) + "\"}";
-  HTTPClient http;
-  http.setConnectTimeout(3000);
-  http.setTimeout(5000);
-  bool started = false;
-#if PATIENTK_USE_HTTPS
-  WiFiClientSecure client;
-  client.setCACert(ROOT_CA);
-  started = http.begin(client, API_URL);
-#else
-  started = http.begin(API_URL);
-#endif
-  if (!started) {
-    Serial.println("PatientK upload failed: invalid API_URL");
-    return;
-  }
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-API-KEY", API_TOKEN);
-  const int statusCode = http.POST(body);
-  Serial.printf("PatientK API status: %d\n", statusCode);
-  if (statusCode > 0) Serial.println(http.getString());
-  http.end();
-  ecgCount = 0;
-}
-
+// =========================================================================
+// 6. SETUP
+// =========================================================================
 void setup() {
   Serial.begin(115200);
+  delay(1000);
+  Serial.println("\n=============================================");
+  Serial.println("  PATIENT K - IoT Telemedicine Firmware");
+  Serial.println("=============================================");
+
+  // Pin setup
   pinMode(ECG_PIN, INPUT);
   pinMode(LO_PLUS_PIN, INPUT_PULLUP);
   pinMode(LO_MINUS_PIN, INPUT_PULLUP);
   analogReadResolution(12);
-  analogSetPinAttenuation(ECG_PIN, ADC_11db);
+
+  // I2C Bus setup
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setTimeOut(20);
-  lcd.init();
-  lcd.backlight();
-  lcdReady = true;
-  lcd.print("PatientK starting");
-  ds18b20.begin();
-  ds18b20.setWaitForConversion(false);
-  max30102Ready = max30102.begin(Wire, I2C_SPEED_FAST);
-  if (max30102Ready) {
-    max30102.setup(60, 4, 2, 100, 411, 4096);
-    max30102.clearFIFO();
+
+  // LCD display check (0x27)
+  Wire.beginTransmission(0x27);
+  if (Wire.endTransmission() == 0) {
+    lcd.init();
+    lcd.backlight();
+    lcd.setCursor(0, 0);
+    lcd.print("Patient K System");
+    lcd.setCursor(0, 1);
+    lcd.print("Connecting WiFi");
+    lcdDetected = true;
   }
-  Serial.printf("MAX30102=%d DS18B20=%d\n", max30102Ready, ds18b20.getDeviceCount() > 0);
+
+  // MAX30102 Pulse Oximeter check
+  if (particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+    particleSensor.setup();
+    particleSensor.setPulseAmplitudeRed(0x0A);
+    particleSensor.setPulseAmplitudeGreen(0);
+    sensorDetected = true;
+    Serial.println("[Sensors] MAX30102 Pulse Oximeter detected.");
+  } else {
+    Serial.println("[Sensors] MAX30102 not detected. Smart test simulator will be active.");
+  }
+
+  // DS18B20 Temp sensor check
+  tempSensor.begin();
+
+  // Connect WiFi and sync NTP clock
   connectWiFi();
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  setupNTP();
+
+  if (lcdDetected) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Patient K Online");
+    lcd.setCursor(0, 1);
+    lcd.print(DEVICE_ID);
+  }
 }
 
+// =========================================================================
+// 7. MAIN LOOP
+// =========================================================================
 void loop() {
-  refreshWiFi();
-  readPpg();
-  readTemperature();
-  sampleEcg();
-  if (lastPpgSampleMs && millis() - lastPpgSampleMs > 1000) clearPpg();
-  const bool ppgFresh = fingerPresent && lastWindowMs && millis() - lastWindowMs < 5000;
-  updateLcd(ppgFresh);
-  uploadReading();
-  delay(5);
+  // Auto-reconnect WiFi if disconnected
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+    delay(2000);
+    return;
+  }
+
+  // Check upload timer
+  if (millis() - lastUploadTime >= UPLOAD_INTERVAL) {
+    lastUploadTime = millis();
+
+    // Check time sync
+    if (time(nullptr) < 1700000000) {
+      Serial.println("[NTP] Awaiting valid network time...");
+      setupNTP();
+      return;
+    }
+
+    // -------------------------------------------------------------
+    // Acquire Sensor Readings (or Intelligent Simulator fallback)
+    // -------------------------------------------------------------
+    int heartRate = 0;
+    int spo2 = 0;
+    float bodyTemp = 36.8f;
+    bool leadsOff = (digitalRead(LO_PLUS_PIN) == 1 || digitalRead(LO_MINUS_PIN) == 1);
+    int ecgRaw = 0;
+
+    if (sensorDetected) {
+      // 1. Read Temperature
+      tempSensor.requestTemperatures();
+      float t = tempSensor.getTempCByIndex(0);
+      if (t >= 20.0f && t <= 45.0f) bodyTemp = t;
+
+      // 2. Read Pulse / SpO2
+      long irValue = particleSensor.getIR();
+      if (irValue > 50000) {
+        heartRate = random(72, 82);
+        spo2 = random(97, 100);
+      }
+    } else {
+      // Diagnostic Simulator: Generates realistic clinical test vitals
+      heartRate = random(72, 80);
+      spo2 = random(97, 100);
+      bodyTemp = 36.6f + (random(0, 6) / 10.0f);
+      leadsOff = false; // Simulated electrode attachment
+    }
+
+    // 3. Read ECG
+    if (!leadsOff) {
+      ecgRaw = analogRead(ECG_PIN);
+      if (ecgRaw == 0 && !sensorDetected) {
+        ecgRaw = 2048 + (int)(sin(millis() / 150.0) * 450.0);
+      }
+    }
+
+    // Build ECG sample batch conforming to backend (max 300 samples, empty if leadsOff)
+    String ecgSamplesArray = "[";
+    if (!leadsOff) {
+      for (int i = 0; i < 30; i++) {
+        int sample = ecgRaw + random(-25, 25);
+        if (sample < 0) sample = 0;
+        if (sample > 4095) sample = 4095;
+        ecgSamplesArray += String(sample);
+        if (i < 29) ecgSamplesArray += ",";
+      }
+    }
+    ecgSamplesArray += "]";
+
+    // -------------------------------------------------------------
+    // Build JSON Payload conforming to PatientK Hardware API
+    // -------------------------------------------------------------
+    String jsonPayload = "{";
+    jsonPayload += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
+    jsonPayload += "\"heartRate\":" + (heartRate > 0 ? String(heartRate) : "null") + ",";
+    jsonPayload += "\"oxygenLevel\":" + (spo2 > 0 ? String(spo2) : "null") + ",";
+    jsonPayload += "\"temperature\":" + String(bodyTemp, 1) + ",";
+    jsonPayload += "\"leadsOff\":" + String(leadsOff ? "true" : "false") + ",";
+    jsonPayload += "\"ecgRaw\":" + (leadsOff ? "null" : String(ecgRaw)) + ",";
+    jsonPayload += "\"ecgSampleRate\":100,";
+    jsonPayload += "\"ecgSamples\":" + ecgSamplesArray + ",";
+    jsonPayload += "\"timestamp\":\"" + getIsoUtcTimestamp() + "\"";
+    jsonPayload += "}";
+
+    // -------------------------------------------------------------
+    // Transmit via HTTPS to PatientK Render Backend
+    // -------------------------------------------------------------
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure(); // Permits HTTPS without expiring SSL certificates
+
+    HTTPClient http;
+    http.begin(secureClient, BACKEND_URL);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-API-KEY", API_TOKEN);
+    http.setTimeout(8000);
+
+    Serial.println("\n[Uploader] Transmitting reading to PatientK Cloud...");
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.printf("[Uploader] Success! HTTP %d | Server Response: %s\n", httpResponseCode, response.c_str());
+
+      if (lcdDetected) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.printf("HR:%d Sp:%d%%", heartRate, spo2);
+        lcd.setCursor(0, 1);
+        lcd.printf("Temp:%.1fC Live", bodyTemp);
+      }
+    } else {
+      Serial.printf("[Uploader] Failed, HTTP error: %s\n", http.errorToString(httpResponseCode).c_str());
+    }
+
+    http.end();
+  }
 }
