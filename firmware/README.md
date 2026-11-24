@@ -8,7 +8,7 @@ Use an ESP32 DevKit (classic dual-core ESP32, not C3/S2). In `firmware/PatientK`
 
 Firmware successfully compiled for esp32dev with PlatformIO using placeholder configuration (970409 bytes flash, 49652 bytes RAM). No physical board was available. Build and bench-test again after entering the actual configuration. See [validation record](VALIDATION.md).
 
-Register using `backend/API_HARDWARE.md`. A trusted database administrator must then set `devices.monitoringPatientId` to the **exact application patient ID string**, e.g. `PAT-2026-0001`. This separate field avoids confusing the existing `patientId` ObjectId reference with the application ID. No assignment is accepted from sensor packets. Example in mongosh, using your actual database:
+Register using `backend/API_HARDWARE.md`. A trusted database administrator must then set `devices.monitoringPatientId` to the **exact application patient ID string**, e.g. `PAT-2026-0001`. This is the only device-to-patient assignment field used by the application. No assignment is accepted from sensor packets. Example in mongosh, using your actual database:
 
 ```js
 db.devices.updateOne({deviceId: "PK-DEVICE-001"}, {$set: {monitoringPatientId: "PAT-2026-0001"}})

@@ -14,7 +14,7 @@
 #define PATIENTK_USE_HTTPS false
 
 // PRODUCTION: use HTTPS and the issuing root CA certificate.
-// #define API_URL "https://api.example.com/api/hardware/update"
+// #define API_URL "https://patientk.onrender.com/api/hardware/update"
 // #define PATIENTK_USE_HTTPS true
 #define ROOT_CA ""
 

@@ -146,6 +146,8 @@ function Register() {
           state: {
             patientId: data.user.patientId,
             name: data.user.name,
+            deviceId: data.device?.deviceId || null,
+            apiToken: data.apiToken || null,
           },
         });
 

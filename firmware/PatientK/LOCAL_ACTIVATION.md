@@ -37,10 +37,10 @@ Register the ESP32 once. Keep the returned API token private.
 ```sh
 curl -X POST http://localhost:5005/api/hardware/register \
   -H "Content-Type: application/json" \
-  -d '{"deviceId":"PK-DEVICE-001","name":"PatientK ESP32 Monitor"}'
+  -d '{"deviceId":"PK-DEVICE-001","name":"PatientK ESP32 Monitor","monitoringPatientId":"PAT-2026-0001"}'
 ```
 
-Create a patient account in PatientK and note its Patient ID, for example `PAT-2026-0001`. Then, in MongoDB Compass or mongosh, pair the device to that patient:
+Create a patient account in PatientK first and use its Patient ID, for example `PAT-2026-0001`, in the registration request. The registration stores that assignment in `monitoringPatientId`.
 
 ```js
 db.devices.updateOne(

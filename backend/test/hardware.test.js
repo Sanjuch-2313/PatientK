@@ -61,7 +61,7 @@ test('hardware HTTP authentication, validation and error contracts', async (t) =
   const vitalURL = `http://127.0.0.1:${server.address().port}/api/vitals`;
   assert.equal((await fetch(vitalURL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 410);
   assert.equal((await fetch(`${vitalURL}/PAT-TEST-001`)).status, 404);
-  const registration = { deviceId: 'PK-TEST-001', name: 'Test device' };
+  const registration = { deviceId: 'PK-TEST-001', name: 'Test device', monitoringPatientId: 'PAT-TEST-001' };
   const reading = { deviceId: registration.deviceId, heartRate: 78, oxygenLevel: 98, temperature: 37.1, timestamp: new Date().toISOString() };
   assert.equal((await request('register', {})).status, 400);
   assert.equal((await request('register', { ...registration, deviceId: { $ne: null } })).status, 400);
@@ -78,7 +78,6 @@ test('hardware HTTP authentication, validation and error contracts', async (t) =
   assert.equal((await request('update', reading)).status, 401);
   assert.equal((await request('update', reading, '0'.repeat(64))).status, 401);
   assert.equal((await request('update', reading, token)).status, 409);
-  record.monitoringPatientId = 'PAT-TEST-001';
   assert.equal((await request('update', reading, token)).status, 200);
   assert.equal(saved[0].patientId, 'PAT-TEST-001');
   assert.equal(saved[0].spo2, 98);
@@ -106,7 +105,7 @@ test('Device schema indexes, reference, validation and hash redaction', async ()
   assert.equal(document.active, true);
   assert.equal(document.toJSON().apiTokenHash, undefined);
   assert.equal(document.toObject().apiTokenHash, undefined);
-  assert.equal(Device.schema.path('patientId').options.ref, 'Patient');
+  assert.equal(Device.schema.path('monitoringPatientId').options.type, String);
   assert.equal(Device.schema.path('apiTokenHash').options.select, false);
   assert.ok(Device.schema.indexes().some(([fields, options]) => fields.deviceId === 1 && options.unique));
   await assert.rejects(new Device({ deviceId: 'bad id', name: 'Test' }).validate());

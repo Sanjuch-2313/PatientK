@@ -5,16 +5,18 @@ import { generateHardwareToken, hashHardwareToken, validDeviceId } from "../util
 
 const isBody = (body) => body && typeof body === "object" && !Array.isArray(body);
 const fail = (res, status, message) => res.status(status).json({ success: false, message });
+const validPatientId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value);
 
 export async function createDevice(req, res) {
   const body = req.body;
-  const allowedKeys = ["deviceId", "name", "patientId", "monitoringPatientId"];
+  const allowedKeys = ["deviceId", "name", "monitoringPatientId"];
   if (!isBody(body) || !validDeviceId(body.deviceId) || typeof body.name !== "string" ||
       !body.name.trim() || body.name.trim().length > 120 ||
+      !validPatientId(body.monitoringPatientId) ||
       Object.keys(body).some((key) => !allowedKeys.includes(key))) {
-    return fail(res, 400, "Provide a valid deviceId and a name of 1–120 characters; only these fields are accepted.");
+    return fail(res, 400, "Provide a valid deviceId, monitoringPatientId and a name of 1–120 characters; only these fields are accepted.");
   }
-  const monitoringPatientId = (body.patientId || body.monitoringPatientId)?.trim() || null;
+  const monitoringPatientId = body.monitoringPatientId.trim();
   try {
     if (monitoringPatientId) {
       const existingAssignment = await Device.findOne({ monitoringPatientId });
@@ -46,11 +48,11 @@ export async function createDevice(req, res) {
 }
 
 export async function assignDevice(req, res) {
-  const { deviceId, patientId } = req.body || {};
-  if (!validDeviceId(deviceId) || typeof patientId !== "string" || !patientId.trim()) {
-    return fail(res, 400, "Provide a valid deviceId and patientId.");
+  const { deviceId, monitoringPatientId } = req.body || {};
+  if (!validDeviceId(deviceId) || typeof monitoringPatientId !== "string" || !monitoringPatientId.trim()) {
+    return fail(res, 400, "Provide a valid deviceId and monitoringPatientId.");
   }
-  const cleanPatientId = patientId.trim();
+  const cleanPatientId = monitoringPatientId.trim();
   try {
     // Enforce 1-to-1 relationship: unassign this patient from any other devices first
     await Device.updateMany(
@@ -71,6 +73,52 @@ export async function assignDevice(req, res) {
     });
   } catch (error) {
     return fail(res, 500, "Unable to assign device.");
+  }
+}
+
+export async function provisionPatientDevice(req, res) {
+  const { monitoringPatientId } = req.body || {};
+  if (!validPatientId(monitoringPatientId)) {
+    return fail(res, 400, "Provide a valid monitoringPatientId.");
+  }
+  const cleanId = monitoringPatientId.trim();
+  try {
+    let device = await Device.findOne({ monitoringPatientId: cleanId });
+    const apiToken = generateHardwareToken();
+    const tokenHash = hashHardwareToken(apiToken);
+
+    if (device) {
+      device.apiTokenHash = tokenHash;
+      device.active = true;
+      await device.save();
+    } else {
+      const count = await Device.countDocuments();
+      let deviceId = `PK-DEV-${String(count + 1).padStart(4, "0")}`;
+      if (await Device.findOne({ deviceId })) {
+        deviceId = `PK-DEV-${Date.now().toString().slice(-6)}`;
+      }
+      device = await Device.create({
+        deviceId,
+        name: `Patient ${cleanId} Monitor`,
+        monitoringPatientId: cleanId,
+        apiTokenHash: tokenHash,
+        active: true,
+      });
+    }
+
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      success: true,
+      message: `Device exclusively provisioned for patient ${cleanId}`,
+      device: {
+        deviceId: device.deviceId,
+        name: device.name,
+        monitoringPatientId: device.monitoringPatientId,
+      },
+      apiToken,
+    });
+  } catch (error) {
+    return fail(res, 500, "Unable to provision device for patient.");
   }
 }
 

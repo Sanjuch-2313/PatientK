@@ -11,28 +11,30 @@ This provisioning route follows the requested interface and currently has no app
 ```sh
 curl -i http://localhost:5005/api/hardware/register \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001","patientId":"PAT-2026-0001"}'
+  -d '{"deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001","monitoringPatientId":"PAT-2026-0001"}'
 ```
 
-Or assign an existing device to a patient at any time:
+Registration creates the device, stores the patient assignment, and returns a unique one-device API token. The patient ID must already exist in the Patient K user records; the device endpoint does not create a second patient account.
+
+To reassign an existing device to another patient:
 
 `POST /api/hardware/assign`
 
 ```sh
 curl -i http://localhost:5005/api/hardware/assign \
   -H 'Content-Type: application/json' \
-  -d '{"deviceId":"PK-DEVICE-001","patientId":"PAT-2026-0001"}'
+  -d '{"deviceId":"PK-DEVICE-001","monitoringPatientId":"PAT-2026-0001"}'
 ```
 
 HTTP 201 (illustrative token placeholder):
 
 ```json
-{"success":true,"device":{"id":"<MongoDB ObjectId>","deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001"},"apiToken":"<64-character lowercase hexadecimal token>"}
+{"success":true,"device":{"id":"<MongoDB ObjectId>","deviceId":"PK-DEVICE-001","name":"Patient K ICU Device 001","monitoringPatientId":"PAT-2026-0001"},"apiToken":"<64-character lowercase hexadecimal token>"}
 ```
 
 The token is shown only in this response, which uses `Cache-Control: no-store`. Securely provision it on the hardware. MongoDB stores only its SHA-256 hash. There is no token retrieval endpoint. Do not log or cache provisioning responses, API key headers, or tokens.
 
-`deviceId` is case-sensitive: 1–64 ASCII letters, digits, underscores or hyphens, beginning with a letter or digit. `name` must contain 1–120 characters after trimming. Only these two registration fields are accepted. The unique MongoDB index prevents concurrent duplicate registration; startup waits for device indexes to initialize.
+`deviceId` is case-sensitive: 1–64 ASCII letters, digits, underscores or hyphens, beginning with a letter or digit. `monitoringPatientId` must be the exact Patient K ID, such as `PAT-2026-0001`. `name` must contain 1–120 characters after trimming. The unique MongoDB indexes prevent duplicate device IDs, token hashes, or patient assignments; startup waits for device indexes to initialize.
 
 ## Authenticate and send data
 

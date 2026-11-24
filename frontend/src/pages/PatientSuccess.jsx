@@ -8,6 +8,8 @@ function PatientSuccess() {
 
   const patientId = location.state?.patientId;
   const patientName = location.state?.name;
+  const deviceId = location.state?.deviceId;
+  const apiToken = location.state?.apiToken;
   const monitoringUrl = patientId
     ? `${window.location.origin}/monitor/${encodeURIComponent(patientId)}`
     : "";
@@ -80,6 +82,43 @@ function PatientSuccess() {
           </button>
 
         </div>
+
+        {/* Assigned ESP32 Device & Token */}
+        {deviceId && (
+          <div className="patient-id-box" style={{ marginTop: "1rem", borderColor: "#3b82f6" }}>
+            <span className="patient-id-label" style={{ color: "#2563eb" }}>
+              ASSIGNED ESP32 DEVICE ID
+            </span>
+            <strong>{deviceId}</strong>
+            <button
+              className="copy-button"
+              onClick={() => navigator.clipboard.writeText(deviceId)}
+            >
+              Copy Device ID
+            </button>
+          </div>
+        )}
+
+        {apiToken && (
+          <div className="patient-id-box" style={{ marginTop: "1rem", borderColor: "#10b981", background: "#f0fdf4" }}>
+            <span className="patient-id-label" style={{ color: "#059669" }}>
+              ESP32 HARDWARE API TOKEN
+            </span>
+            <code style={{ fontSize: "0.85rem", wordBreak: "break-all", display: "block", margin: "0.5rem 0", color: "#065f46" }}>
+              {apiToken}
+            </code>
+            <button
+              className="copy-button"
+              style={{ background: "#059669" }}
+              onClick={() => navigator.clipboard.writeText(apiToken)}
+            >
+              Copy API Token
+            </button>
+            <small style={{ display: "block", marginTop: "0.4rem", color: "#6b7280", fontSize: "0.78rem" }}>
+              Paste this token and Device ID into your ESP32 Arduino code for this patient.
+            </small>
+          </div>
+        )}
 
         {/* QR */}
         <div className="qr-section">
