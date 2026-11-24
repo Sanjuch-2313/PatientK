@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { QRCodeCanvas } from "qrcode.react";
+import EcgWaveform from "../components/EcgWaveform";
+import { API_BASE_URL } from "../config";
 import "./PatientDashboard.css";
 
 function PatientDashboard() {
@@ -7,18 +10,11 @@ function PatientDashboard() {
 
   const [user, setUser] = useState(null);
 
-  // Synthetic vitals for now
-  const [vitals, setVitals] = useState({
-    heartRate: 78,
-    spo2: 97,
-    systolic: 120,
-    diastolic: 80,
-    temperature: 36.8,
-  });
-
-  const [lastUpdated, setLastUpdated] = useState(
-    new Date()
-  );
+  const emptyVitals = { heartRate: null, spo2: null, systolic: null, diastolic: null, temperature: null };
+  const [vitals, setVitals] = useState(emptyVitals);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [sensorStatus, setSensorStatus] = useState("Waiting for sensor data");
+  const [showQr, setShowQr] = useState(false);
 
   // ==========================================
   // LOAD LOGGED-IN USER
@@ -48,136 +44,34 @@ function PatientDashboard() {
     }
   }, [navigate]);
 
-// ==========================================
-// SYNTHETIC VITALS → BACKEND
-// ==========================================
-
-useEffect(() => {
-
-  if (!user) return;
-
-  const patientId =
-    user.patientId ||
-    localStorage.getItem("patientId");
-
-  if (!patientId) return;
-
-
-  const sendSyntheticVitals = async () => {
-
-    try {
-
-      const syntheticVitals = {
-        patientId,
-
-        heartRate:
-          Math.floor(Math.random() * 10) + 73,
-
-        spo2:
-          Math.floor(Math.random() * 3) + 96,
-
-        systolic:
-          Math.floor(Math.random() * 8) + 116,
-
-        diastolic:
-          Math.floor(Math.random() * 6) + 77,
-
-        temperature:
-          Number(
-            (36.5 + Math.random() * 0.6).toFixed(1)
-          ),
-
-        source: "synthetic",
-      };
-
-
-      const response = await fetch(
-        "http://localhost:5005/api/vitals",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(
-            syntheticVitals
-          ),
+  useEffect(() => {
+    if (!user) return;
+    const patientId = user.patientId || localStorage.getItem("patientId");
+    if (!patientId) return;
+    let disposed = false;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/vitals/${encodeURIComponent(patientId)}`, { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok || !data.vital) throw new Error("No recent sensor data");
+        if (!disposed) {
+          setVitals(data.vital);
+          setLastUpdated(new Date(data.vital.measuredAt));
+          setSensorStatus("Recent sensor data received");
         }
-      );
-
-
-      const data = await response.json();
-
-
-      if (!response.ok) {
-
-        console.error(
-          "Failed to save vitals:",
-          data.message
-        );
-
-        return;
+      } catch {
+        if (!disposed) {
+          setVitals({ heartRate: null, spo2: null, systolic: null, diastolic: null, temperature: null });
+          setLastUpdated(null);
+          setSensorStatus("Sensor data unavailable or stale");
+        }
       }
-
-
-      // Display the values returned by backend
-
-      if (data.vital) {
-
-        setVitals({
-          heartRate:
-            data.vital.heartRate,
-
-          spo2:
-            data.vital.spo2,
-
-          systolic:
-            data.vital.systolic,
-
-          diastolic:
-            data.vital.diastolic,
-
-          temperature:
-            data.vital.temperature,
-        });
-
-        setLastUpdated(
-          new Date(data.vital.createdAt)
-        );
-
-      }
-
-    } catch (error) {
-
-      console.error(
-        "Vitals API error:",
-        error
-      );
-
-    }
-
-  };
-
-
-  // Send immediately
-
-  sendSyntheticVitals();
-
-
-  // Then every 10 seconds
-
-  const interval = setInterval(
-    sendSyntheticVitals,
-    10000
-  );
-
-
-  return () => {
-    clearInterval(interval);
-  };
-
-}, [user]);
+    };
+    refresh();
+    const interval = setInterval(refresh, 3000);
+    return () => { disposed = true; controller.abort(); clearInterval(interval); };
+  }, [user]);
 
   // ==========================================
   // LOGOUT
@@ -340,11 +234,11 @@ useEffect(() => {
             <div>
 
               <strong>
-                Raspberry Pi
+                ESP32
               </strong>
 
               <span>
-                Monitoring device connected
+                {sensorStatus}
               </span>
 
             </div>
@@ -356,7 +250,7 @@ useEffect(() => {
 
             <span className="status-dot"></span>
 
-            Simulated monitoring active
+            {sensorStatus}
 
           </div>
 
@@ -384,9 +278,7 @@ useEffect(() => {
           </div>
 
           <button
-            onClick={() =>
-              navigate("/patient-success")
-            }
+            onClick={() => setShowQr(true)}
           >
             View QR →
           </button>
@@ -415,7 +307,7 @@ useEffect(() => {
             </div>
 
             <span className="live-indicator">
-              ● LIVE
+              {lastUpdated ? "● RECENT DATA" : "WAITING"}
             </span>
 
           </div>
@@ -442,7 +334,7 @@ useEffect(() => {
 
               <div className="vital-value">
 
-                {vitals.heartRate}
+                {vitals.heartRate ?? "—"}
 
                 <small>
                   BPM
@@ -451,7 +343,7 @@ useEffect(() => {
               </div>
 
               <div className="vital-normal">
-                ● Normal range
+                Measurement only; no clinical assessment
               </div>
 
             </div>
@@ -475,7 +367,7 @@ useEffect(() => {
 
               <div className="vital-value">
 
-                {vitals.spo2}
+                {vitals.spo2 ?? "—"}
 
                 <small>
                   %
@@ -484,7 +376,7 @@ useEffect(() => {
               </div>
 
               <div className="vital-normal">
-                ● Normal range
+                Measurement only; no clinical assessment
               </div>
 
             </div>
@@ -508,13 +400,13 @@ useEffect(() => {
 
               <div className="vital-value">
 
-                {vitals.systolic}
+                {vitals.systolic ?? "—"}
 
                 <small>
                   /
                 </small>
 
-                {vitals.diastolic}
+                {vitals.diastolic ?? "—"}
 
                 <small>
                   mmHg
@@ -523,7 +415,7 @@ useEffect(() => {
               </div>
 
               <div className="vital-normal">
-                ● Normal range
+                Measurement only; no clinical assessment
               </div>
 
             </div>
@@ -547,7 +439,7 @@ useEffect(() => {
 
               <div className="vital-value">
 
-                {vitals.temperature}
+                {vitals.temperature ?? "—"}
 
                 <small>
                   °C
@@ -556,7 +448,7 @@ useEffect(() => {
               </div>
 
               <div className="vital-normal">
-                ● Normal range
+                Measurement only; no clinical assessment
               </div>
 
             </div>
@@ -569,6 +461,8 @@ useEffect(() => {
         {/* =====================================
             LOWER SECTION
         ===================================== */}
+
+        <EcgWaveform patientId={user.patientId || localStorage.getItem("patientId")} />
 
         <section className="patient-bottom-grid">
 
@@ -599,16 +493,15 @@ useEffect(() => {
 
             <div className="last-update">
 
-              {lastUpdated.toLocaleTimeString([], {
+              {lastUpdated?.toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
-              })}
+              }) ?? "No recent reading"}
 
             </div>
 
             <p>
-              Data refreshes automatically every
-              10 seconds in demo mode.
+              Checks for sensor data every 3 seconds.
             </p>
 
           </div>
@@ -639,12 +532,11 @@ useEffect(() => {
             </div>
 
             <div className="health-status">
-              Stable
+              Not assessed
             </div>
 
             <p>
-              No abnormal readings detected
-              in the current demo data.
+              Missing readings are shown as unavailable.
             </p>
 
           </div>
@@ -658,20 +550,50 @@ useEffect(() => {
         <div className="demo-notice">
 
           <strong>
-            Demo Mode
+            Hardware monitoring
           </strong>
 
           <span>
-            Current readings are simulated for
-            prototype demonstration. Real sensor
-            data will be connected through the
-            Raspberry Pi.
+            ESP32 sensor readings only. Blood pressure is unavailable with this hardware. Temperature requires a calibrated contact thermistor.
           </span>
 
         </div>
 
 
       </main>
+
+      {showQr && (
+        <div className="qr-modal-backdrop" role="presentation" onClick={() => setShowQr(false)}>
+          <section
+            className="qr-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qr-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className="qr-modal-close"
+              type="button"
+              aria-label="Close QR code"
+              onClick={() => setShowQr(false)}
+            >
+              ×
+            </button>
+            <p>SHARE MONITORING</p>
+            <h2 id="qr-modal-title">Your Patient QR</h2>
+            <QRCodeCanvas
+              value={`${window.location.origin}/monitor/${encodeURIComponent(user.patientId || localStorage.getItem("patientId"))}`}
+              size={220}
+              bgColor="#ffffff"
+              fgColor="#111827"
+              level="H"
+              includeMargin
+            />
+            <strong>{user.patientId || localStorage.getItem("patientId")}</strong>
+            <span>Doctor or family members scan this code, then log in to view monitoring.</span>
+          </section>
+        </div>
+      )}
 
     </div>
   );

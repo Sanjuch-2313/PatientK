@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { API_BASE_URL } from "../config";
 import "./Login.css";
 
 function Login() {
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +38,7 @@ function Login() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5005/api/auth/login",
+        `${API_BASE_URL}/api/auth/login`,
         {
           method: "POST",
 
@@ -66,7 +68,7 @@ function Login() {
       ) {
 
         throw new Error(
-          "Backend did not return JSON. Check that the Patient K backend is running on port 5005."
+          "Backend did not return JSON. Check that the Patient K backend is running."
         );
 
       }
@@ -131,6 +133,12 @@ function Login() {
       const userRole =
         data.user?.role;
 
+      const next = searchParams.get("next");
+      if (next?.startsWith("/monitor/")) {
+        navigate(next);
+        return;
+      }
+
 
       /*
         TEMPORARILY GO TO HOME.
@@ -152,7 +160,7 @@ function Login() {
 
       } else if (userRole === "nurse") {
 
-        navigate("/");
+        navigate("/nurse-dashboard");
 
       } else if (userRole === "family") {
 

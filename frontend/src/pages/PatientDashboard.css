@@ -548,6 +548,52 @@
   color: #718079;
 }
 
+.qr-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, .58);
+}
+
+.qr-modal {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(100%, 380px);
+  padding: 34px;
+  border-radius: 20px;
+  background: #fff;
+  text-align: center;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .3);
+}
+
+.qr-modal p {
+  margin: 0;
+  color: #5273a2;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.qr-modal h2 { margin: 0; }
+.qr-modal span { color: #61718a; font-size: 14px; line-height: 1.5; }
+
+.qr-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+
 
 .demo-notice strong {
   color: #4e675a;

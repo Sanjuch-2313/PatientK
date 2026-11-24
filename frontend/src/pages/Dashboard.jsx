@@ -166,7 +166,7 @@ function Dashboard() {
               <div className="monitor-top">
 
                 <div>
-                  <small>PATIENT MONITOR</small>
+                  <small>ILLUSTRATIVE DEMO — NOT SENSOR DATA</small>
 
                   <h3>Patient K</h3>
 

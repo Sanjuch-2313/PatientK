@@ -1,0 +1,52 @@
+.shared-monitoring-page {
+  min-height: 100vh;
+  padding: 48px 20px;
+  background: #f4f7fb;
+  color: #172033;
+}
+
+.shared-monitoring-card {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 36px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 50px rgba(25, 43, 77, 0.12);
+}
+
+.shared-monitoring-label {
+  margin: 0;
+  color: #5273a2;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.shared-monitoring-card h1 { margin: 10px 0; }
+.shared-monitoring-status { color: #246b52; font-weight: 600; }
+
+.shared-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 28px 0;
+}
+
+.shared-vital {
+  min-height: 125px;
+  padding: 22px;
+  border-radius: 14px;
+  background: #f6f9fd;
+}
+
+.shared-vital span, .shared-vital small { display: block; color: #63728b; }
+.shared-vital strong { display: inline-block; margin: 12px 8px 0 0; font-size: 34px; }
+.shared-vital small { display: inline-block; }
+.shared-monitoring-time { font-weight: 600; }
+.shared-monitoring-note { color: #63728b; font-size: 14px; }
+
+@media (max-width: 560px) {
+  .shared-monitoring-page { padding: 20px 12px; }
+  .shared-monitoring-card { padding: 24px; }
+  .shared-vitals-grid { grid-template-columns: 1fr; }
+}

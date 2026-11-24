@@ -8,6 +8,8 @@ import PatientSuccess from "./pages/PatientSuccess";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import FamilyDashboard from "./pages/FamilyDashboard";
+import SharedMonitoring from "./pages/SharedMonitoring";
+import NurseDashboard from "./pages/NurseDashboard";
 
 function App() {
   return (
@@ -48,6 +50,13 @@ function App() {
           path="/family-dashboard"
           element={<FamilyDashboard />}
         />
+
+        <Route
+          path="/monitor/:patientId"
+          element={<SharedMonitoring />}
+        />
+
+        <Route path="/nurse-dashboard" element={<NurseDashboard />} />
 
       </Routes>
     </BrowserRouter>

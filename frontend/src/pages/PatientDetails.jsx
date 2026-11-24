@@ -4,15 +4,7 @@ function PatientDetails() {
   const navigate = useNavigate();
   const { patientId } = useParams();
 
-  // Temporary simulated data
-  const vitals = {
-    heartRate: 78,
-    spo2: 97,
-    temperature: 37.1,
-    systolic: 120,
-    diastolic: 80,
-  };
-
+  const vitals = { heartRate: "—", spo2: "—", temperature: "—", systolic: "—", diastolic: "—" };
   return (
     <div className="app-page">
 
@@ -59,7 +51,7 @@ function PatientDetails() {
 
           <div className="patient-status">
             <span>●</span>
-            Stable
+            Not assessed
           </div>
 
         </section>
@@ -73,11 +65,11 @@ function PatientDetails() {
           </span>
 
           <span>
-            Monitoring active
+            Open the patient dashboard for sensor readings
           </span>
 
           <span className="last-updated">
-            Last updated: Just now
+            No sensor reading loaded
           </span>
 
         </div>
@@ -100,7 +92,7 @@ function PatientDetails() {
             </h2>
 
             <span className="normal">
-              Normal
+              Unavailable
             </span>
 
           </div>
@@ -119,7 +111,7 @@ function PatientDetails() {
             </h2>
 
             <span className="normal">
-              Normal
+              Unavailable
             </span>
 
           </div>
@@ -138,7 +130,7 @@ function PatientDetails() {
             </h2>
 
             <span className="normal">
-              Normal
+              Unavailable
             </span>
 
           </div>
@@ -156,7 +148,7 @@ function PatientDetails() {
             </h2>
 
             <span className="normal">
-              Normal
+              Unavailable
             </span>
 
           </div>
@@ -224,12 +216,11 @@ function PatientDetails() {
 
             <div>
               <strong>
-                No active alerts
+                Alert assessment unavailable
               </strong>
 
               <p>
-                All monitored vital signs are currently
-                within the configured range.
+                No measurements loaded in this view.
               </p>
             </div>
 

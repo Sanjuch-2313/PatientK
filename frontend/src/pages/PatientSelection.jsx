@@ -8,7 +8,7 @@ function PatientSelection() {
       id: "PK001",
       name: "Patient K",
       surgery: "Post-Surgery Care",
-      status: "Stable",
+      status: "Example patient — no sensor data",
     },
   ];
 

@@ -202,7 +202,7 @@ const ComingSoon = () => {
 
                 <div className="online">
                   <i></i>
-                  Live
+                  Demo preview
                 </div>
 
               </div>

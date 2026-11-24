@@ -8,6 +8,9 @@ function PatientSuccess() {
 
   const patientId = location.state?.patientId;
   const patientName = location.state?.name;
+  const monitoringUrl = patientId
+    ? `${window.location.origin}/monitor/${encodeURIComponent(patientId)}`
+    : "";
 
   if (!patientId) {
     return (
@@ -86,14 +89,14 @@ function PatientSuccess() {
           </h3>
 
           <p>
-            Show this QR code to your doctor
-            to identify your Patient K profile.
+            A doctor or authorised family member can scan this QR
+            to open your live monitoring page after they log in.
           </p>
 
           <div className="qr-wrapper">
 
             <QRCodeCanvas
-              value={patientId}
+              value={monitoringUrl}
               size={210}
               bgColor="#ffffff"
               fgColor="#111827"
@@ -104,7 +107,7 @@ function PatientSuccess() {
           </div>
 
           <p className="qr-note">
-            Patient ID encoded in this QR:
+            This QR opens monitoring for:
             <br />
             <strong>{patientId}</strong>
           </p>

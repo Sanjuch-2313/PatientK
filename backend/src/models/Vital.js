@@ -10,33 +10,39 @@ const vitalSchema = new mongoose.Schema(
 
     heartRate: {
       type: Number,
-      required: true,
+      default: null,
     },
 
     spo2: {
       type: Number,
-      required: true,
+      default: null,
     },
 
     systolic: {
       type: Number,
-      required: true,
+      default: null,
     },
 
     diastolic: {
       type: Number,
-      required: true,
+      default: null,
     },
 
     temperature: {
       type: Number,
-      required: true,
+      default: null,
     },
 
+    deviceId: String,
+    measuredAt: Date,
+    ambientTemperature: Number,
+    humidity: Number,
+    ecgRaw: Number,
+    leadsOff: Boolean,
     source: {
       type: String,
       enum: ["synthetic", "raspberry-pi", "sensor"],
-      default: "synthetic",
+      default: "sensor",
     },
   },
   {

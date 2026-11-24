@@ -158,6 +158,21 @@
   font-size: 12px;
 }
 
+.family-device-status, .family-trend, .family-alert {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid #e2e9e4;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.family-device-status { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.family-device-status span { display: block; margin-top: 5px; color: #718079; font-size: 13px; }
+.family-online { color: #277451; }.family-offline { color: #a24a3b; }
+.family-alert { border-color: #f4c4b8; background: #fff2ee; color: #9b402e; }
+.family-trend > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; color: #4c695a; }
+.family-trend span { padding: 7px 10px; border-radius: 7px; background: #edf6f0; font-weight: 700; }
+
 
 /* PATIENT */
 

@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import EcgWaveform from "../components/EcgWaveform";
+import { API_BASE_URL } from "../config";
 import "./FamilyDashboard.css";
 
 function FamilyDashboard() {
@@ -8,6 +10,14 @@ function FamilyDashboard() {
 
   const [patientId, setPatientId] = useState("");
   const [vitals, setVitals] = useState(null);
+  const [device, setDevice] = useState(null);
+  const [history, setHistory] = useState([]);
+  useEffect(() => {
+    const timer = setInterval(() => setVitals(current =>
+      current && Date.now() - Date.parse(current.measuredAt) <= 15000 ? current : null), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,14 +31,22 @@ function FamilyDashboard() {
 
     try {
 
+      setVitals(null);
+      setDevice(null);
+      setHistory([]);
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        `http://localhost:5005/api/vitals/${patientId.trim()}`
-      );
+      const id = patientId.trim();
+      const [response, deviceResponse, historyResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/vitals/${encodeURIComponent(id)}`),
+        fetch(`${API_BASE_URL}/api/care/${encodeURIComponent(id)}/device`),
+        fetch(`${API_BASE_URL}/api/vitals/${encodeURIComponent(id)}/history`),
+      ]);
 
-      const data = await response.json();
+      const [data, deviceData, historyData] = await Promise.all([
+        response.json(), deviceResponse.json(), historyResponse.json(),
+      ]);
 
       if (!response.ok) {
         throw new Error(
@@ -37,6 +55,8 @@ function FamilyDashboard() {
       }
 
       setVitals(data.vital);
+      setDevice(deviceResponse.ok ? deviceData.device : null);
+      setHistory(historyResponse.ok ? historyData.vitals.slice(0, 8).reverse() : []);
 
     } catch (error) {
 
@@ -167,7 +187,7 @@ function FamilyDashboard() {
               </div>
 
               <span>
-                ● Stable
+                Not assessed
               </span>
 
             </div>
@@ -183,7 +203,7 @@ function FamilyDashboard() {
                 </span>
 
                 <strong>
-                  {vitals.heartRate}
+                  {vitals.heartRate ?? "—"}
                   <small> BPM</small>
                 </strong>
 
@@ -197,7 +217,7 @@ function FamilyDashboard() {
                 </span>
 
                 <strong>
-                  {vitals.spo2}
+                  {vitals.spo2 ?? "—"}
                   <small> %</small>
                 </strong>
 
@@ -211,8 +231,8 @@ function FamilyDashboard() {
                 </span>
 
                 <strong>
-                  {vitals.systolic}/
-                  {vitals.diastolic}
+                  {vitals.systolic ?? "—"}/
+                  {vitals.diastolic ?? "—"}
                   <small> mmHg</small>
                 </strong>
 
@@ -226,13 +246,15 @@ function FamilyDashboard() {
                 </span>
 
                 <strong>
-                  {vitals.temperature}
+                  {vitals.temperature ?? "—"}
                   <small> °C</small>
                 </strong>
 
               </div>
 
             </div>
+
+            <EcgWaveform patientId={patientId} compact />
 
 
             <div className="family-notice">
@@ -247,6 +269,31 @@ function FamilyDashboard() {
                 ).toLocaleString()}
               </span>
 
+            </div>
+
+            <div className="family-device-status">
+              <div>
+                <strong>Monitoring device</strong>
+                <span>{device ? `${device.name} · ${device.deviceId}` : "No device assigned"}</span>
+              </div>
+              <b className={device?.online ? "family-online" : "family-offline"}>
+                {device?.online ? "● Sending data" : "● Device offline"}
+              </b>
+            </div>
+
+            {(vitals.leadsOff || !device?.online) && (
+              <div className="family-alert">
+                {vitals.leadsOff ? "ECG electrodes are disconnected." : "The monitoring device has not sent recent data."}
+              </div>
+            )}
+
+            <div className="family-trend">
+              <strong>Recent heart-rate readings</strong>
+              <div>
+                {history.length ? history.map((reading) => (
+                  <span key={reading._id}>{reading.heartRate ?? "—"}</span>
+                )) : "No stored history yet."}
+              </div>
             </div>
 
 
