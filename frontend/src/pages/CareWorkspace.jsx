@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EcgWaveform from "../components/EcgWaveform";
 import { API_BASE_URL } from "../config";
+import { celsiusToFahrenheit } from "../utils/temperature";
 import "./CareWorkspace.css";
 
 const api = API_BASE_URL;
@@ -110,7 +111,7 @@ function CareWorkspace({ role }) {
         </section>
 
         <section className="care-vitals">
-          {[["Heart rate", vital?.heartRate ?? empty.heartRate, "BPM"], ["Blood oxygen", vital?.spo2 ?? empty.spo2, "%"], ["Contact temperature", vital?.temperature ?? empty.temperature, "°C"], ["Blood pressure", null, "Unavailable"]].map(([label, value, unit]) => <article key={label}><span>{label}</span><strong>{value ?? "—"}</strong><small>{unit}</small></article>)}
+          {[["Heart rate", vital?.heartRate ?? empty.heartRate, "BPM"], ["Blood oxygen", vital?.spo2 ?? empty.spo2, "%"], ["Contact temperature", celsiusToFahrenheit(vital?.temperature ?? empty.temperature), "°F"], ["Blood pressure", null, "Unavailable"]].map(([label, value, unit]) => <article key={label}><span>{label}</span><strong>{value ?? "—"}</strong><small>{unit}</small></article>)}
         </section>
 
         <EcgWaveform patientId={patientId} />

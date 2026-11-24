@@ -34,6 +34,8 @@ HTTP 201 (illustrative token placeholder):
 
 The token is shown only in this response, which uses `Cache-Control: no-store`. Securely provision it on the hardware. MongoDB stores only its SHA-256 hash. There is no token retrieval endpoint. Do not log or cache provisioning responses, API key headers, or tokens.
 
+Do not call provisioning again after the token has been flashed to the device; provisioning the same patient returns `409` and leaves the existing token valid. If a token is intentionally lost or rotated, call `POST /api/hardware/rotate-token` with `{"deviceId":"PK-DEVICE-001"}` and flash the newly returned token.
+
 `deviceId` is case-sensitive: 1–64 ASCII letters, digits, underscores or hyphens, beginning with a letter or digit. `monitoringPatientId` must be the exact Patient K ID, such as `PAT-2026-0001`. `name` must contain 1–120 characters after trimming. The unique MongoDB indexes prevent duplicate device IDs, token hashes, or patient assignments; startup waits for device indexes to initialize.
 
 ## Authenticate and send data

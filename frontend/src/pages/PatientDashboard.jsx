@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import EcgWaveform from "../components/EcgWaveform";
 import { API_BASE_URL } from "../config";
+import { celsiusToFahrenheit } from "../utils/temperature";
 import "./PatientDashboard.css";
 
 function PatientDashboard() {
@@ -439,10 +440,10 @@ function PatientDashboard() {
 
               <div className="vital-value">
 
-                {vitals.temperature ?? "—"}
+                {celsiusToFahrenheit(vitals.temperature) ?? "—"}
 
                 <small>
-                  °C
+                  °F
                 </small>
 
               </div>

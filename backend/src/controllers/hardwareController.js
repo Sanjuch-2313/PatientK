@@ -84,27 +84,23 @@ export async function provisionPatientDevice(req, res) {
   const cleanId = monitoringPatientId.trim();
   try {
     let device = await Device.findOne({ monitoringPatientId: cleanId });
-    const apiToken = generateHardwareToken();
-    const tokenHash = hashHardwareToken(apiToken);
-
     if (device) {
-      device.apiTokenHash = tokenHash;
-      device.active = true;
-      await device.save();
-    } else {
-      const count = await Device.countDocuments();
-      let deviceId = `PK-DEV-${String(count + 1).padStart(4, "0")}`;
-      if (await Device.findOne({ deviceId })) {
-        deviceId = `PK-DEV-${Date.now().toString().slice(-6)}`;
-      }
-      device = await Device.create({
-        deviceId,
-        name: `Patient ${cleanId} Monitor`,
-        monitoringPatientId: cleanId,
-        apiTokenHash: tokenHash,
-        active: true,
-      });
+      return fail(res, 409, `Patient ${cleanId} already has device ${device.deviceId}. The existing token remains valid; use /api/hardware/rotate-token only when intentionally rotating it.`);
     }
+
+    const apiToken = generateHardwareToken();
+    const count = await Device.countDocuments();
+    let deviceId = `PK-DEV-${String(count + 1).padStart(4, "0")}`;
+    if (await Device.findOne({ deviceId })) {
+      deviceId = `PK-DEV-${Date.now().toString().slice(-6)}`;
+    }
+    device = await Device.create({
+      deviceId,
+      name: `Patient ${cleanId} Monitor`,
+      monitoringPatientId: cleanId,
+      apiTokenHash: hashHardwareToken(apiToken),
+      active: true,
+    });
 
     res.set("Cache-Control", "no-store");
     return res.json({
@@ -119,6 +115,28 @@ export async function provisionPatientDevice(req, res) {
     });
   } catch (error) {
     return fail(res, 500, "Unable to provision device for patient.");
+  }
+}
+
+export async function rotateDeviceToken(req, res) {
+  const { deviceId } = req.body || {};
+  if (!validDeviceId(deviceId)) return fail(res, 400, "Provide a valid deviceId.");
+  try {
+    const apiToken = generateHardwareToken();
+    const device = await Device.findOneAndUpdate(
+      { deviceId },
+      { $set: { apiTokenHash: hashHardwareToken(apiToken), active: true } },
+      { returnDocument: "after" },
+    );
+    if (!device) return fail(res, 404, "Device not found.");
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      success: true,
+      device: { deviceId: device.deviceId, monitoringPatientId: device.monitoringPatientId },
+      apiToken,
+    });
+  } catch {
+    return fail(res, 500, "Unable to rotate device token.");
   }
 }
 
@@ -145,16 +163,19 @@ export async function receiveHardwareUpdate(req, res) {
       !Number.isFinite(Date.parse(body.timestamp)) || Math.abs(Date.now() - Date.parse(body.timestamp)) > 30000) {
     return fail(res, 400, "Provide current timestamp (within 30 seconds), nullable sensor numbers within hardware limits, and valid fields.");
   }
-  if (body.deviceId !== req.device.deviceId) return fail(res, 403, "Token does not belong to this deviceId.");
+  if (body.deviceId !== req.device.deviceId) {
+    return fail(res, 403, "Token does not belong to this deviceId.");
+  }
   if (!req.device.monitoringPatientId) return fail(res, 409, "Assign monitoringPatientId to the device before sending readings.");
   try {
     const measuredAt = new Date(body.timestamp);
-    await Vital.create({ patientId: req.device.monitoringPatientId, deviceId: body.deviceId,
+    const canonicalDeviceId = req.device.deviceId;
+    await Vital.create({ patientId: req.device.monitoringPatientId, deviceId: canonicalDeviceId,
       heartRate: body.heartRate, spo2: body.oxygenLevel, temperature: body.temperature,
       ambientTemperature: body.ambientTemperature ?? null, humidity: body.humidity ?? null,
       ecgRaw: body.ecgRaw ?? null, leadsOff: body.leadsOff, measuredAt, source: "sensor" });
     if (hasEcgTrace) {
-      await EcgTrace.create({ patientId: req.device.monitoringPatientId, deviceId: body.deviceId,
+      await EcgTrace.create({ patientId: req.device.monitoringPatientId, deviceId: canonicalDeviceId,
         capturedAt: measuredAt, sampleRateHz: body.ecgSampleRate, leadsOff: body.leadsOff, samples: body.ecgSamples });
     }
     return res.json({ success: true, message: "Hardware data saved", deviceId: req.device.deviceId });

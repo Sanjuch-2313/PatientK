@@ -126,7 +126,7 @@ function PatientDetails() {
 
             <h2>
               {vitals.temperature}
-              <small> °C</small>
+              <small> °F</small>
             </h2>
 
             <span className="normal">

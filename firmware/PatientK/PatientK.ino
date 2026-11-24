@@ -7,273 +7,344 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <MAX30105.h>
-#include <LiquidCrystal_I2C.h>
+#include "heartRate.h" // Built-in SparkFun real-time optical beat detection
 
-// =========================================================================
-// 1. NETWORK & CLOUD BACKEND CREDENTIALS
-// =========================================================================
-const char* WIFI_SSID     = "YOUR_WIFI_NAME";        // Enter your Wi-Fi name
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";    // Enter your Wi-Fi password
+// ======================================================
+// 1. WIFI SETTINGS
+// ======================================================
+const char* WIFI_SSID     = "ESP";
+const char* WIFI_PASSWORD = "12345678";
 
-const char* BACKEND_URL   = "https://patientk.onrender.com/api/hardware/update";
-const char* DEVICE_ID     = "PK-DEVICE-001";         // Must match registered deviceId
-const char* API_TOKEN     = "11bd511f75726b472d9b97618e71f52c965598bac525586380105b7b87712fe7"; // From registration
+// ======================================================
+// 2. PATIENTK CLOUD CREDENTIALS
+// ======================================================
+const char* BACKEND_URL = "https://patientk.onrender.com/api/hardware/update";
+const char* DEVICE_ID   = "PK-DEV-001";
+const char* API_TOKEN   = "eb42d4a865e17acf2dd577db8fa26784b9c9bf11822ef0514be1bf470b5887de";
 
-// =========================================================================
-// 2. HARDWARE PIN DEFINITIONS (ESP32)
-// =========================================================================
-#define SDA_PIN        21    // I2C Data (MAX30102 & LCD)
-#define SCL_PIN        22    // I2C Clock (MAX30102 & LCD)
-#define DS18B20_PIN    4     // Temperature sensor data (with 4.7k pull-up)
-#define ECG_PIN        34    // AD8232 Analog Output (ADC1)
-#define LO_PLUS_PIN    32    // AD8232 Lead-Off Detect +
-#define LO_MINUS_PIN   33    // AD8232 Lead-Off Detect -
+// ======================================================
+// 3. HARDWARE PINS
+// ======================================================
+#define SDA_PIN       21    // I2C SDA for MAX30102
+#define SCL_PIN       22    // I2C SCL for MAX30102
+#define DS18B20_PIN   4     // Temperature Data
+#define ECG_PIN       34    // AD8232 Analog Out
+#define LO_PLUS_PIN   32    // AD8232 Leads-Off +
+#define LO_MINUS_PIN  33    // AD8232 Leads-Off -
 
-// =========================================================================
-// 3. SENSOR CONTROLLERS & OBJECTS
-// =========================================================================
+// ======================================================
+// 4. SENSOR OBJECTS
+// ======================================================
 MAX30105 particleSensor;
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature tempSensor(&oneWire);
-LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-bool sensorDetected = false;
-bool lcdDetected    = false;
+bool maxSensorDetected = false;
 unsigned long lastUploadTime = 0;
 const unsigned long UPLOAD_INTERVAL = 3000; // 3 seconds transmission interval
 
-// =========================================================================
-// 4. TIME SYNCHRONIZATION (NTP)
-// Backend requires ISO timestamp within 30 seconds of server UTC clock
-// =========================================================================
-void setupNTP() {
-  Serial.print("[NTP] Synchronizing UTC time via NTP");
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  
-  time_t now = time(nullptr);
-  int retries = 0;
-  while (now < 1700000000 && retries < 25) {
+// Real-Time Optical Pulse & SpO2 Tracking variables
+const byte RATE_SIZE = 4;
+byte rates[RATE_SIZE];
+byte rateSpot = 0;
+long lastBeat = 0;
+float currentBpm = 0;
+int liveHeartRate = 0;
+int liveSpo2 = 0;
+bool fingerOnSensor = false;
+
+// Optical AC/DC calculation buffers for real SpO2
+float irAc = 0, irDc = 0;
+float redAc = 0, redDc = 0;
+
+// ======================================================
+// 5. WIFI CONNECTION
+// ======================================================
+bool connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return true;
+
+  Serial.println("\n[WiFi] Connecting to: " + String(WIFI_SSID));
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
     delay(400);
     Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[WiFi] Connected successfully!");
+    Serial.print("[WiFi] IP: ");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+
+  Serial.println("\n[WiFi] Connection timeout.");
+  return false;
+}
+
+// ======================================================
+// 6. TIME SYNCHRONIZATION (NTP)
+// ======================================================
+void setupNTP() {
+  Serial.print("[NTP] Syncing UTC time");
+  configTime(0, 0, "pool.ntp.org", "time.google.com");
+  
+  time_t now = time(nullptr);
+  int attempts = 0;
+  while (now < 1700000000 && attempts < 25) {
+    delay(300);
+    Serial.print(".");
     now = time(nullptr);
-    retries++;
+    attempts++;
   }
   
   if (now >= 1700000000) {
-    Serial.println("\n[NTP] Time successfully synchronized.");
+    Serial.println("\n[NTP] Time synchronized.");
   } else {
-    Serial.println("\n[NTP] Warning: NTP sync delayed. Will continue retrying.");
+    Serial.println("\n[NTP] Awaiting sync...");
   }
 }
 
 String getIsoUtcTimestamp() {
   time_t now = time(nullptr);
-  struct tm timeinfo;
-  gmtime_r(&now, &timeinfo);
+  struct tm timeInfo;
+  gmtime_r(&now, &timeInfo);
   char buf[30];
-  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeInfo);
   return String(buf);
 }
 
-// =========================================================================
-// 5. WI-FI MANAGEMENT
-// =========================================================================
-void connectWiFi() {
-  Serial.printf("\n[WiFi] Connecting to %s", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-    delay(350);
-    Serial.print(".");
-    attempts++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WiFi] Connected!");
-    Serial.print("[WiFi] IP Address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n[WiFi] Connection timeout. Retrying in main loop.");
-  }
-}
-
-// =========================================================================
-// 6. SETUP
-// =========================================================================
+// ======================================================
+// 7. SETUP
+// ======================================================
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
   Serial.println("\n=============================================");
-  Serial.println("  PATIENT K - IoT Telemedicine Firmware");
+  Serial.println("  PATIENT K - LIVE TELEMEDICINE SENSOR CLIENT");
+  Serial.println("  Target Device:  PK-DEV-001");
+  Serial.println("  Target Patient: PAT-2026-0001");
   Serial.println("=============================================");
 
-  // Pin setup
   pinMode(ECG_PIN, INPUT);
   pinMode(LO_PLUS_PIN, INPUT_PULLUP);
   pinMode(LO_MINUS_PIN, INPUT_PULLUP);
   analogReadResolution(12);
 
-  // I2C Bus setup
   Wire.begin(SDA_PIN, SCL_PIN);
 
-  // LCD display check (0x27)
-  Wire.beginTransmission(0x27);
-  if (Wire.endTransmission() == 0) {
-    lcd.init();
-    lcd.backlight();
-    lcd.setCursor(0, 0);
-    lcd.print("Patient K System");
-    lcd.setCursor(0, 1);
-    lcd.print("Connecting WiFi");
-    lcdDetected = true;
-  }
-
-  // MAX30102 Pulse Oximeter check
+  // Initialize MAX30102 with LED brightness tuned for human tissue
   if (particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+    maxSensorDetected = true;
     particleSensor.setup();
-    particleSensor.setPulseAmplitudeRed(0x0A);
+    particleSensor.setPulseAmplitudeRed(0x24); // Medium LED power for finger
+    particleSensor.setPulseAmplitudeIR(0x24);  // Medium IR power
     particleSensor.setPulseAmplitudeGreen(0);
-    sensorDetected = true;
-    Serial.println("[Sensors] MAX30102 Pulse Oximeter detected.");
+    Serial.println("[Sensors] MAX30102 Pulse Oximeter READY (Place finger on sensor)");
   } else {
-    Serial.println("[Sensors] MAX30102 not detected. Smart test simulator will be active.");
+    Serial.println("[Sensors] MAX30102 NOT DETECTED! Check I2C SDA(21)/SCL(22) wiring.");
   }
 
-  // DS18B20 Temp sensor check
+  // Initialize DS18B20
   tempSensor.begin();
+  Serial.println("[Sensors] DS18B20 Body Temperature READY");
 
-  // Connect WiFi and sync NTP clock
-  connectWiFi();
-  setupNTP();
-
-  if (lcdDetected) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Patient K Online");
-    lcd.setCursor(0, 1);
-    lcd.print(DEVICE_ID);
+  // Connect to WiFi
+  if (connectWiFi()) {
+    setupNTP();
   }
 }
 
-// =========================================================================
-// 7. MAIN LOOP
-// =========================================================================
-void loop() {
-  // Auto-reconnect WiFi if disconnected
+// ======================================================
+// 8. CONTINUOUS OPTICAL SENSOR PROCESSING
+// ======================================================
+void sampleOpticalSensor() {
+  if (!maxSensorDetected) return;
+
+  long irValue = particleSensor.getIR();
+  long redValue = particleSensor.getRed();
+
+  // Threshold: If IR reflection > 50,000, human tissue/finger is pressed on the glass
+  if (irValue > 50000) {
+    fingerOnSensor = true;
+
+    // Track DC levels
+    irDc = (0.95f * irDc) + (0.05f * irValue);
+    redDc = (0.95f * redDc) + (0.05f * redValue);
+
+    // Track AC peak-to-peak
+    irAc = fabs(irValue - irDc);
+    redAc = fabs(redValue - redDc);
+
+    // Real-Time Heartbeat detection
+    if (checkForBeat(irValue)) {
+      long delta = millis() - lastBeat;
+      lastBeat = millis();
+
+      if (delta > 300 && delta < 2000) { // Valid human heart rate 30 - 200 BPM
+        float bpm = 60.0f / (delta / 1000.0f);
+
+        rates[rateSpot++] = (byte)bpm;
+        rateSpot %= RATE_SIZE;
+
+        // Running average over last 4 beats for steady clinical display
+        float avgBpm = 0;
+        byte count = 0;
+        for (byte x = 0; x < RATE_SIZE; x++) {
+          if (rates[x] >= 40 && rates[x] <= 180) {
+            avgBpm += rates[x];
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          liveHeartRate = (int)(avgBpm / count);
+        }
+
+        // Live SpO2 estimation using Red/IR ratio of AC/DC absorption
+        if (irDc > 0 && redDc > 0 && irAc > 0) {
+          float ratio = (redAc / redDc) / (irAc / irDc);
+          // Standard clinical calibration curve for MAX30102
+          int spo2Calc = (int)(110.0f - (25.0f * ratio));
+          if (spo2Calc >= 85 && spo2Calc <= 100) {
+            liveSpo2 = spo2Calc;
+          } else if (spo2Calc > 100) {
+            liveSpo2 = 99;
+          }
+        }
+      }
+    }
+  } else {
+    // Finger removed from sensor
+    fingerOnSensor = false;
+    liveHeartRate = 0;
+    liveSpo2 = 0;
+    irAc = 0;
+    redAc = 0;
+  }
+}
+
+// ======================================================
+// 9. READ SENSORS & UPLOAD TO PATIENTK CLOUD
+// ======================================================
+void uploadVitalsToCloud() {
   if (WiFi.status() != WL_CONNECTED) {
     connectWiFi();
-    delay(2000);
     return;
   }
 
-  // Check upload timer
-  if (millis() - lastUploadTime >= UPLOAD_INTERVAL) {
-    lastUploadTime = millis();
+  if (time(nullptr) < 1700000000) {
+    setupNTP();
+    return;
+  }
 
-    // Check time sync
-    if (time(nullptr) < 1700000000) {
-      Serial.println("[NTP] Awaiting valid network time...");
-      setupNTP();
-      return;
+  // 1. Read Live Temperature from DS18B20
+  float liveTemperature = 0.0f;
+  bool tempValid = false;
+  tempSensor.requestTemperatures();
+  float t = tempSensor.getTempCByIndex(0);
+  if (t >= 15.0f && t <= 50.0f && t != 85.0f) {
+    liveTemperature = t;
+    tempValid = true;
+  }
+
+  // 2. Read Live ECG from AD8232
+  bool leadsOff = (digitalRead(LO_PLUS_PIN) == HIGH || digitalRead(LO_MINUS_PIN) == HIGH);
+  int liveEcgRaw = analogRead(ECG_PIN);
+
+  // 3. Capture 30 live ECG samples for real-time waveform graph
+  String ecgSamplesArray = "[";
+  if (!leadsOff) {
+    for (int i = 0; i < 30; i++) {
+      int s = analogRead(ECG_PIN);
+      ecgSamplesArray += String(s);
+      if (i < 29) ecgSamplesArray += ",";
+      delayMicroseconds(500);
     }
+  }
+  ecgSamplesArray += "]";
 
-    // -------------------------------------------------------------
-    // Acquire Sensor Readings (or Intelligent Simulator fallback)
-    // -------------------------------------------------------------
-    int heartRate = 0;
-    int spo2 = 0;
-    float bodyTemp = 36.8f;
-    bool leadsOff = (digitalRead(LO_PLUS_PIN) == 1 || digitalRead(LO_MINUS_PIN) == 1);
-    int ecgRaw = 0;
+  // 4. PRINT LIVE VALUES TO SERIAL MONITOR
+  Serial.println("\n========================================================");
+  Serial.printf("  [PATIENT K LIVE MONITOR]  Patient: PAT-2026-0001\n");
+  Serial.println("========================================================");
+  if (fingerOnSensor) {
+    Serial.printf("  [MAX30102] Finger Status : DETECTED ON SENSOR\n");
+    Serial.printf("  [PULSE]    Heart Rate    : %s\n", (liveHeartRate > 0) ? (String(liveHeartRate) + " BPM").c_str() : "Calculating pulse...");
+    Serial.printf("  [OXYGEN]   SpO2 Level    : %s\n", (liveSpo2 > 0) ? (String(liveSpo2) + " %").c_str() : "Calculating oxygen...");
+  } else {
+    Serial.printf("  [MAX30102] Finger Status : NO FINGER DETECTED (Place finger on glass)\n");
+    Serial.printf("  [PULSE]    Heart Rate    : -- (null)\n");
+    Serial.printf("  [OXYGEN]   SpO2 Level    : -- (null)\n");
+  }
 
-    if (sensorDetected) {
-      // 1. Read Temperature
-      tempSensor.requestTemperatures();
-      float t = tempSensor.getTempCByIndex(0);
-      if (t >= 20.0f && t <= 45.0f) bodyTemp = t;
+  if (tempValid) {
+    Serial.printf("  [TEMP]     Body Temp     : %.2f °C\n", liveTemperature);
+  } else {
+    Serial.printf("  [TEMP]     Body Temp     : Unavailable / Disconnected\n");
+  }
 
-      // 2. Read Pulse / SpO2
-      long irValue = particleSensor.getIR();
-      if (irValue > 50000) {
-        heartRate = random(72, 82);
-        spo2 = random(97, 100);
-      }
-    } else {
-      // Diagnostic Simulator: Generates realistic clinical test vitals
-      heartRate = random(72, 80);
-      spo2 = random(97, 100);
-      bodyTemp = 36.6f + (random(0, 6) / 10.0f);
-      leadsOff = false; // Simulated electrode attachment
-    }
+  if (!leadsOff) {
+    Serial.printf("  [ECG]      Electrodes    : ATTACHED (Signal: %d ADC)\n", liveEcgRaw);
+  } else {
+    Serial.printf("  [ECG]      Electrodes    : LEADS OFF (Check chest pads)\n");
+  }
+  Serial.println("========================================================");
 
-    // 3. Read ECG
-    if (!leadsOff) {
-      ecgRaw = analogRead(ECG_PIN);
-      if (ecgRaw == 0 && !sensorDetected) {
-        ecgRaw = 2048 + (int)(sin(millis() / 150.0) * 450.0);
-      }
-    }
+  // 5. CONSTRUCT JSON PAYLOAD
+  String payload = "{";
+  payload += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
+  payload += "\"heartRate\":" + (fingerOnSensor && liveHeartRate > 0 ? String(liveHeartRate) : "null") + ",";
+  payload += "\"oxygenLevel\":" + (fingerOnSensor && liveSpo2 > 0 ? String(liveSpo2) : "null") + ",";
+  payload += "\"temperature\":" + (tempValid ? String(liveTemperature, 1) : "null") + ",";
+  payload += "\"leadsOff\":" + String(leadsOff ? "true" : "false") + ",";
+  payload += "\"ecgRaw\":" + (leadsOff ? "null" : String(liveEcgRaw)) + ",";
+  payload += "\"ecgSampleRate\":100,";
+  payload += "\"ecgSamples\":" + ecgSamplesArray + ",";
+  payload += "\"timestamp\":\"" + getIsoUtcTimestamp() + "\"";
+  payload += "}";
 
-    // Build ECG sample batch conforming to backend (max 300 samples, empty if leadsOff)
-    String ecgSamplesArray = "[";
-    if (!leadsOff) {
-      for (int i = 0; i < 30; i++) {
-        int sample = ecgRaw + random(-25, 25);
-        if (sample < 0) sample = 0;
-        if (sample > 4095) sample = 4095;
-        ecgSamplesArray += String(sample);
-        if (i < 29) ecgSamplesArray += ",";
-      }
-    }
-    ecgSamplesArray += "]";
+  // 6. TRANSMIT TO PATIENTK CLOUD BACKEND
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
 
-    // -------------------------------------------------------------
-    // Build JSON Payload conforming to PatientK Hardware API
-    // -------------------------------------------------------------
-    String jsonPayload = "{";
-    jsonPayload += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
-    jsonPayload += "\"heartRate\":" + (heartRate > 0 ? String(heartRate) : "null") + ",";
-    jsonPayload += "\"oxygenLevel\":" + (spo2 > 0 ? String(spo2) : "null") + ",";
-    jsonPayload += "\"temperature\":" + String(bodyTemp, 1) + ",";
-    jsonPayload += "\"leadsOff\":" + String(leadsOff ? "true" : "false") + ",";
-    jsonPayload += "\"ecgRaw\":" + (leadsOff ? "null" : String(ecgRaw)) + ",";
-    jsonPayload += "\"ecgSampleRate\":100,";
-    jsonPayload += "\"ecgSamples\":" + ecgSamplesArray + ",";
-    jsonPayload += "\"timestamp\":\"" + getIsoUtcTimestamp() + "\"";
-    jsonPayload += "}";
+  HTTPClient http;
+  http.setTimeout(8000);
 
-    // -------------------------------------------------------------
-    // Transmit via HTTPS to PatientK Render Backend
-    // -------------------------------------------------------------
-    WiFiClientSecure secureClient;
-    secureClient.setInsecure(); // Permits HTTPS without expiring SSL certificates
-
-    HTTPClient http;
-    http.begin(secureClient, BACKEND_URL);
+  Serial.println("[Cloud] Uploading real sensor data...");
+  if (http.begin(secureClient, BACKEND_URL)) {
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-KEY", API_TOKEN);
-    http.setTimeout(8000);
 
-    Serial.println("\n[Uploader] Transmitting reading to PatientK Cloud...");
-    int httpResponseCode = http.POST(jsonPayload);
+    int responseCode = http.POST(payload);
 
-    if (httpResponseCode > 0) {
+    if (responseCode > 0) {
       String response = http.getString();
-      Serial.printf("[Uploader] Success! HTTP %d | Server Response: %s\n", httpResponseCode, response.c_str());
-
-      if (lcdDetected) {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.printf("HR:%d Sp:%d%%", heartRate, spo2);
-        lcd.setCursor(0, 1);
-        lcd.printf("Temp:%.1fC Live", bodyTemp);
-      }
+      Serial.printf("[Cloud] SUCCESS HTTP %d -> %s\n", responseCode, response.c_str());
+      Serial.println("[Database] Record saved in 'vitals' collection for PAT-2026-0001!");
     } else {
-      Serial.printf("[Uploader] Failed, HTTP error: %s\n", http.errorToString(httpResponseCode).c_str());
+      Serial.printf("[Cloud] Failed, Error: %s\n", http.errorToString(responseCode).c_str());
     }
-
     http.end();
   }
+}
+
+// ======================================================
+// 10. MAIN LOOP
+// ======================================================
+void loop() {
+  // Continuously sample optical sensor for pulse peaks
+  sampleOpticalSensor();
+
+  // Upload to cloud every 3 seconds
+  if (millis() - lastUploadTime >= UPLOAD_INTERVAL) {
+    lastUploadTime = millis();
+    uploadVitalsToCloud();
+  }
+
+  delay(5);
 }

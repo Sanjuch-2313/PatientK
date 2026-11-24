@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EcgWaveform from "../components/EcgWaveform";
 import { API_BASE_URL } from "../config";
+import { celsiusToFahrenheit } from "../utils/temperature";
 import "./FamilyDashboard.css";
 
 function FamilyDashboard() {
@@ -246,8 +247,8 @@ function FamilyDashboard() {
                 </span>
 
                 <strong>
-                  {vitals.temperature ?? "—"}
-                  <small> °C</small>
+                  {celsiusToFahrenheit(vitals.temperature) ?? "—"}
+                  <small> °F</small>
                 </strong>
 
               </div>

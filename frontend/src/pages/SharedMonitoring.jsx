@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import EcgWaveform from "../components/EcgWaveform";
 import { API_BASE_URL } from "../config";
+import { celsiusToFahrenheit } from "../utils/temperature";
 import "./SharedMonitoring.css";
 
 const emptyVitals = {
@@ -60,7 +61,7 @@ function SharedMonitoring() {
   const cards = [
     ["Heart rate", vitals.heartRate, "BPM"],
     ["Blood oxygen", vitals.spo2, "%"],
-    ["Contact temperature", vitals.temperature, "°C"],
+    ["Contact temperature", celsiusToFahrenheit(vitals.temperature), "°F"],
     ["Blood pressure", null, "Not available with this hardware"],
   ];
 

@@ -205,12 +205,12 @@ function Dashboard() {
 
 
                 <div className="vital">
-                  <div className="vital-icon">°C</div>
+                  <div className="vital-icon">°F</div>
 
                   <small>Temperature</small>
 
                   <strong>
-                    37.1 <span>°C</span>
+                    98.8 <span>°F</span>
                   </strong>
                 </div>
 
@@ -565,7 +565,7 @@ function Dashboard() {
                   <div className="sensor-card">
 
                     <div className="sensor-symbol">
-                      °C
+                      °F
                     </div>
 
                     <div>
@@ -574,7 +574,7 @@ function Dashboard() {
 
                       <span>Temperature</span>
 
-                      <small>°C</small>
+                      <small>°F</small>
 
                     </div>
 
