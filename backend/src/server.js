@@ -15,8 +15,11 @@ const app = express();
 await connectDB();
 await Device.init();
 
-const allowedOrigins = process.env.FRONTEND_URL
+const configuredOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : [];
+const allowedOrigins = configuredOrigins.length
+  ? [...new Set(["https://patientk.netlify.app", ...configuredOrigins])]
   : true;
 
 app.use(cors({
