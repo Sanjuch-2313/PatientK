@@ -16,18 +16,27 @@ await connectDB();
 await Device.init();
 
 const configuredOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(",").map((origin) => origin.trim()).filter(Boolean)
+  ? process.env.FRONTEND_URL.split(",")
+      .map((origin) => origin.trim().replace(/\/+$/, ""))
+      .filter(Boolean)
   : [];
 const allowedOrigins = configuredOrigins.length
   ? [...new Set(["https://patientk.netlify.app", ...configuredOrigins])]
   : true;
-
-app.use(cors({
-  origin: allowedOrigins,
+const corsOptions = {
+  origin: (requestOrigin, callback) => {
+    if (!requestOrigin || allowedOrigins === true || allowedOrigins.includes(requestOrigin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-API-KEY"],
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 
