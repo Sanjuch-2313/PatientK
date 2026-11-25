@@ -34,6 +34,8 @@ const char* API_TOKEN    = "00fbdcfe3fa817376e6786e5e86300f3b63593e61217872c9b24
 #define LO_PLUS_PIN     32
 #define LO_MINUS_PIN    33
 #define BUZZER_PIN      25
+#define BUZZER_LEDC_CH  0        // LEDC channel 0 (free on ESP32)
+#define BUZZER_FREQ_HZ  2500     // 2.5 kHz works for both active & passive buzzers
 #define BUZZER_ON_LEVEL HIGH
 
 // ======================================================
@@ -252,6 +254,24 @@ void refreshLocalVitals() {
 }
 
 // ======================================================
+// BUZZER HELPERS — use LEDC (safe inside FreeRTOS tasks)
+// tone() uses a hardware timer that conflicts with RTOS.
+// ledcWrite() uses the PWM peripheral — always reliable.
+// ======================================================
+void buzzerOn() {
+  ledcWrite(BUZZER_LEDC_CH, 128);   // 50% duty = audible tone
+}
+void buzzerOff() {
+  ledcWrite(BUZZER_LEDC_CH, 0);     // 0 duty = silence
+  digitalWrite(BUZZER_PIN, LOW);    // ensure pin is fully LOW
+}
+void buzzerBeep(int durationMs) {   // blocking beep for startup only
+  buzzerOn();
+  delay(durationMs);
+  buzzerOff();
+}
+
+// ======================================================
 // 11. SENSOR TASK — pinned to Core 1, HIGH priority
 //     Never blocked by WiFi. Runs every ~1 ms.
 // ======================================================
@@ -300,11 +320,10 @@ void sensorTask(void* param) {
       }
     }
 
-    // ── D. Buzzer ─────────────────────────────────────
+    // ── D. Buzzer (LEDC-based, safe in FreeRTOS) ─────────
     bool isCrit = false;
     if (xSemaphoreTake(vitalsMutex, 0) == pdTRUE) {
       isCrit = vitals.critical;
-      // Also check temperature threshold
       if (vitals.tempValid &&
           (vitals.tempC >= TEMP_CRIT_HIGH || vitals.tempC <= TEMP_CRIT_LOW))
         isCrit = true;
@@ -314,11 +333,11 @@ void sensorTask(void* param) {
       if (millis() - lastBuzzerToggle >= 300) {
         lastBuzzerToggle = millis();
         buzzerState = !buzzerState;
-        buzzerState ? tone(BUZZER_PIN, 2500) : noTone(BUZZER_PIN);
+        buzzerState ? buzzerOn() : buzzerOff();
       }
     } else if (buzzerState) {
-      buzzerState = false; noTone(BUZZER_PIN);
-      digitalWrite(BUZZER_PIN, !BUZZER_ON_LEVEL);
+      buzzerState = false;
+      buzzerOff();
     }
 
     vTaskDelay(pdMS_TO_TICKS(1));   // yield 1 ms
@@ -348,7 +367,20 @@ void uploadTask(void* param) {
     vTaskDelay(pdMS_TO_TICKS(UPLOAD_INTERVAL));
 
     if (WiFi.status() != WL_CONNECTED) {
-      connectWiFi(); continue;
+      connectWiFi();
+      if (WiFi.status() == WL_CONNECTED && time(nullptr) < 1700000000) {
+        setupNTP();
+      }
+      continue;
+    }
+
+    // Ensure NTP clock is synced before sending timestamped payload
+    if (time(nullptr) < 1700000000) {
+      setupNTP();
+      if (time(nullptr) < 1700000000) {
+        Serial.println("[NTP] Waiting for valid UTC time before uploading...");
+        continue;
+      }
     }
 
     // ── Snapshot shared vitals ────────────────────────
@@ -441,8 +473,10 @@ void uploadTask(void* param) {
       http.addHeader("Content-Type", "application/json");
       http.addHeader("X-API-KEY", API_TOKEN);
       int code = http.POST(payload);
-      if (code > 0) {
-        Serial.printf("[Cloud] HTTP %d OK\n", code);
+      if (code >= 200 && code < 300) {
+        Serial.printf("[Cloud] HTTP %d OK | %s\n", code, http.getString().c_str());
+      } else if (code > 0) {
+        Serial.printf("[Cloud] HTTP %d ERROR | %s\n", code, http.getString().c_str());
       } else {
         Serial.printf("[Cloud] Error: %s\n", http.errorToString(code).c_str());
       }
@@ -469,10 +503,12 @@ void setup() {
   analogReadResolution(12);
   analogSetPinAttenuation(ECG_PIN, ADC_11db);
 
-  // Buzzer
+  // Buzzer — init LEDC channel (safe from any FreeRTOS task)
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, !BUZZER_ON_LEVEL);
-  tone(BUZZER_PIN, 2500, 300);   // startup beep
+  digitalWrite(BUZZER_PIN, LOW);
+  ledcSetup(BUZZER_LEDC_CH, BUZZER_FREQ_HZ, 8);  // ch=0, 2500 Hz, 8-bit PWM
+  ledcAttachPin(BUZZER_PIN, BUZZER_LEDC_CH);
+  buzzerBeep(300);   // 300 ms startup beep — confirms buzzer is wired correctly
 
   // I2C
   Wire.begin(SDA_PIN, SCL_PIN);

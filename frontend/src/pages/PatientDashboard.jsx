@@ -5,6 +5,8 @@ import EcgWaveform from "../components/EcgWaveform";
 import AnatomicalHeart from "../components/AnatomicalHeart";
 import { API_BASE_URL } from "../config";
 import { celsiusToFahrenheit } from "../utils/temperature";
+import { useCriticalAlarm } from "../hooks/useCriticalAlarm";
+import CriticalAlarmBanner from "../components/CriticalAlarmBanner";
 import "./PatientDashboard.css";
 
 function PatientDashboard() {
@@ -25,6 +27,14 @@ function PatientDashboard() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selectedDay, setSelectedDay] = useState(() => new Date().toDateString());
+
+  // ── Critical alarm (browser beep + notification) ──────────
+  const { isCritical, criticalReasons, permissionState } = useCriticalAlarm(vitals);
+  function handleAllowAlarm() {
+    Notification.requestPermission();
+    // Also unlock AudioContext on user gesture
+    try { new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+  }
 
   // ==========================================
   // LOAD LOGGED-IN USER
@@ -53,6 +63,25 @@ function PatientDashboard() {
       navigate("/login");
     }
   }, [navigate]);
+
+  // Testing flow: request camera permission once when the patient dashboard opens.
+  // The stream is immediately stopped; the clinician opens the live stream later.
+  useEffect(() => {
+    if (!user || localStorage.getItem("pk_camera_permission_requested") === "true") return undefined;
+    let stream;
+    const requestCameraPermission = async () => {
+      localStorage.setItem("pk_camera_permission_requested", "true");
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        stream.getTracks().forEach((track) => track.stop());
+      } catch {
+        // The clinician can still try the camera later after browser permission is changed.
+      }
+    };
+    requestCameraPermission();
+    return () => stream?.getTracks().forEach((track) => track.stop());
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -202,6 +231,12 @@ function PatientDashboard() {
 
   return (
     <div className="pk-shell-bg">
+      <CriticalAlarmBanner
+        isCritical={isCritical}
+        criticalReasons={criticalReasons}
+        permissionState={permissionState}
+        onAllow={handleAllowAlarm}
+      />
       <div className="pk-dashboard-frame">
         {/* =====================================
             TOP NAVIGATION BAR

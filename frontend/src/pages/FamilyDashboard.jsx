@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import EcgWaveform from "../components/EcgWaveform";
 import { API_BASE_URL } from "../config";
 import { celsiusToFahrenheit } from "../utils/temperature";
+import { useCriticalAlarm } from "../hooks/useCriticalAlarm";
+import CriticalAlarmBanner from "../components/CriticalAlarmBanner";
 import "./FamilyDashboard.css";
 
 function FamilyDashboard() {
@@ -13,6 +15,13 @@ function FamilyDashboard() {
   const [vitals, setVitals] = useState(null);
   const [device, setDevice] = useState(null);
   const [history, setHistory] = useState([]);
+
+  // ── Critical alarm (browser beep + notification) ──────────
+  const { isCritical, criticalReasons, permissionState } = useCriticalAlarm(vitals);
+  function handleAllowAlarm() {
+    Notification.requestPermission();
+    try { new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+  }
   useEffect(() => {
     const timer = setInterval(() => setVitals(current =>
       current && Date.now() - Date.parse(current.measuredAt) <= 15000 ? current : null), 1000);
@@ -86,6 +95,12 @@ function FamilyDashboard() {
   return (
 
     <div className="family-dashboard">
+      <CriticalAlarmBanner
+        isCritical={isCritical}
+        criticalReasons={criticalReasons}
+        permissionState={permissionState}
+        onAllow={handleAllowAlarm}
+      />
 
       <header className="family-header">
 
