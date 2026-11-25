@@ -29,12 +29,7 @@ function PatientDashboard() {
   const [selectedDay, setSelectedDay] = useState(() => new Date().toDateString());
 
   // ── Critical alarm (browser beep + notification) ──────────
-  const { isCritical, criticalReasons, permissionState } = useCriticalAlarm(vitals);
-  function handleAllowAlarm() {
-    Notification.requestPermission();
-    // Also unlock AudioContext on user gesture
-    try { new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
-  }
+  const { isCritical, criticalReasons, permissionState, requestAlarmPermissions } = useCriticalAlarm(vitals);
 
   // ==========================================
   // LOAD LOGGED-IN USER
@@ -235,7 +230,7 @@ function PatientDashboard() {
         isCritical={isCritical}
         criticalReasons={criticalReasons}
         permissionState={permissionState}
-        onAllow={handleAllowAlarm}
+        onAllow={requestAlarmPermissions}
       />
       <div className="pk-dashboard-frame">
         {/* =====================================

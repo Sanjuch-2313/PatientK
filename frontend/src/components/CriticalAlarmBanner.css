@@ -46,6 +46,12 @@
   transform: scale(1.04);
 }
 
+.cab-perm-allow:disabled {
+  cursor: wait;
+  opacity: 0.75;
+  transform: none;
+}
+
 /* ── Critical banner ────────────────────────────────────────── */
 .cab-critical-banner {
   position: sticky;

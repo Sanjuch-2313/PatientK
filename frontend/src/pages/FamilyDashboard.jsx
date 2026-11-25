@@ -17,11 +17,7 @@ function FamilyDashboard() {
   const [history, setHistory] = useState([]);
 
   // ── Critical alarm (browser beep + notification) ──────────
-  const { isCritical, criticalReasons, permissionState } = useCriticalAlarm(vitals);
-  function handleAllowAlarm() {
-    Notification.requestPermission();
-    try { new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
-  }
+  const { isCritical, criticalReasons, permissionState, requestAlarmPermissions } = useCriticalAlarm(vitals);
   useEffect(() => {
     const timer = setInterval(() => setVitals(current =>
       current && Date.now() - Date.parse(current.measuredAt) <= 15000 ? current : null), 1000);
@@ -99,7 +95,7 @@ function FamilyDashboard() {
         isCritical={isCritical}
         criticalReasons={criticalReasons}
         permissionState={permissionState}
-        onAllow={handleAllowAlarm}
+        onAllow={requestAlarmPermissions}
       />
 
       <header className="family-header">

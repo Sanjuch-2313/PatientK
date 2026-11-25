@@ -25,18 +25,26 @@ const THRESHOLDS = {
   TEMP_LOW:   35.0,  // °C
 };
 
-// ── Web Audio beep generator ─────────────────────────────────────────────────
-function createBeep(ctx, freq = 880, duration = 0.18, volume = 0.6) {
+// ── Web Audio buzzer generator ──────────────────────────────────────────────
+// A square wave gives a sharper, hardware-buzzer-like alarm than a soft sine tone.
+function createBuzzerPulse(ctx, freq = 1250, duration = 0.14, volume = 0.38) {
   const osc  = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);
   gain.connect(ctx.destination);
-  osc.type      = "sine";
+  osc.type      = "square";
   osc.frequency.value = freq;
-  gain.gain.setValueAtTime(volume, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.008);
+  gain.gain.setValueAtTime(volume, ctx.currentTime + Math.max(0.01, duration - 0.025));
+  gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + duration);
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + duration);
+}
+
+function playBuzzer(ctx) {
+  createBuzzerPulse(ctx, 1250, 0.13, 0.36);
+  window.setTimeout(() => createBuzzerPulse(ctx, 900, 0.13, 0.3), 180);
 }
 
 // ── Evaluate vitals against thresholds ──────────────────────────────────────
@@ -63,22 +71,15 @@ export function useCriticalAlarm(vitals) {
   const notifCooldown  = useRef(0);
   const [isCritical, setIsCritical]       = useState(false);
   const [criticalReasons, setCriticalReasons] = useState([]);
+  // Keep the strip visible until this page load receives a user gesture. A
+  // notification permission may already be granted while mobile audio is still locked.
   const [permissionState, setPermissionState] = useState("default");
 
-  // Ask for notification permission once on mount
+  // Read the existing state on mount. Permission requests themselves must happen
+  // from a user gesture on mobile browsers, so the banner button handles the request.
   useEffect(() => {
     if (!("Notification" in window)) return;
-    if (Notification.permission === "granted") {
-      setPermissionState("granted");
-      return;
-    }
-    if (Notification.permission !== "denied") {
-      Notification.requestPermission().then(result => {
-        setPermissionState(result);
-      });
-    } else {
-      setPermissionState("denied");
-    }
+    if (Notification.permission === "denied") setPermissionState("denied");
   }, []);
 
   // Lazy-create AudioContext on first user gesture (browser policy)
@@ -97,20 +98,18 @@ export function useCriticalAlarm(vitals) {
     if (beepIntervalRef.current) return;   // already running
     const ctx = ensureAudioCtx();
 
-    // Immediately fire first beep
-    createBeep(ctx, 880, 0.18, 0.7);
-    setTimeout(() => createBeep(ctx, 660, 0.14, 0.5), 220);
+    // Immediately fire the first buzzer pulse.
+    playBuzzer(ctx);
 
     // Then repeat every 1.5 seconds
     beepIntervalRef.current = setInterval(() => {
       const c = ensureAudioCtx();
-      createBeep(c, 880, 0.18, 0.7);
-      setTimeout(() => createBeep(c, 660, 0.14, 0.5), 220);
+      playBuzzer(c);
     }, 1500);
 
     // Browser notification (throttled to once per 30 s)
     const now = Date.now();
-    if (now - notifCooldown.current > 30000 && Notification.permission === "granted") {
+    if ("Notification" in window && now - notifCooldown.current > 30000 && Notification.permission === "granted") {
       notifCooldown.current = now;
       try {
         new Notification("🚨 PatientK — Critical Alert", {
@@ -121,6 +120,31 @@ export function useCriticalAlarm(vitals) {
         });
       } catch (_) {}
     }
+  }, [ensureAudioCtx]);
+
+  const requestAlarmPermissions = useCallback(async () => {
+    try {
+      const ctx = ensureAudioCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      // Audible confirmation proves the mobile browser accepted the gesture.
+      playBuzzer(ctx);
+    } catch (_) {
+      // Keep the banner usable even when a browser has no Web Audio support.
+    }
+
+    if ("Notification" in window && Notification.permission !== "granted") {
+      try {
+        const result = await Notification.requestPermission();
+        setPermissionState(result);
+        return result;
+      } catch (_) {
+        setPermissionState("denied");
+        return "denied";
+      }
+    }
+
+    setPermissionState("granted");
+    return "granted";
   }, [ensureAudioCtx]);
 
   const stopAlarm = useCallback(() => {
@@ -163,5 +187,5 @@ export function useCriticalAlarm(vitals) {
     };
   }, [stopAlarm]);
 
-  return { isCritical, criticalReasons, permissionState };
+  return { isCritical, criticalReasons, permissionState, requestAlarmPermissions };
 }

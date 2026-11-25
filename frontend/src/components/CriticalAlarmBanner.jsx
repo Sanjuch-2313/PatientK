@@ -12,6 +12,7 @@
  *   permissionState "default" | "granted" | "denied"
  *   onAllow         () => void  — called when user clicks Allow
  */
+import { useState } from "react";
 import "./CriticalAlarmBanner.css";
 
 export default function CriticalAlarmBanner({
@@ -20,18 +21,28 @@ export default function CriticalAlarmBanner({
   permissionState,
   onAllow,
 }) {
+  const [feedback, setFeedback] = useState("");
+
+  const handleAllow = async () => {
+    setFeedback("Enabling buzzer...");
+    await onAllow();
+    setFeedback("Buzzer enabled for this session");
+    window.setTimeout(() => setFeedback(""), 2400);
+  };
+
   return (
     <>
       {/* ── Permission strip (shown until user decides) ── */}
-      {permissionState === "default" && (
-        <div className="cab-permission-strip">
+      {(permissionState !== "granted" || feedback) && (
+        <div className={`cab-permission-strip ${permissionState === "denied" ? "denied" : ""}`}>
           <span className="cab-perm-icon">🔔</span>
           <span className="cab-perm-text">
-            PatientK needs permission to play <strong>alert sounds</strong> and
-            show <strong>notifications</strong> when vitals are critical.
+            {feedback || (permissionState === "denied"
+              ? "Notifications are blocked. Enable them in your browser site settings; the buzzer can still be tested here."
+              : <>PatientK needs permission to play <strong>buzzer alerts</strong> and show <strong>notifications</strong> when vitals are critical.</>)}
           </span>
-          <button className="cab-perm-allow" onClick={onAllow}>
-            Allow Sound &amp; Notifications
+          <button className="cab-perm-allow" onClick={handleAllow} disabled={Boolean(feedback)}>
+            {permissionState === "denied" ? "Try again" : "Enable Buzzer & Notifications"}
           </button>
         </div>
       )}

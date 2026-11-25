@@ -22,11 +22,7 @@ function CareWorkspace({ role }) {
   const [reportForm, setReportForm] = useState({ symptoms: "", history: "", assessment: "" });
 
   // ── Critical alarm (browser beep + notification) ──────────
-  const { isCritical, criticalReasons, permissionState } = useCriticalAlarm(vital);
-  function handleAllowAlarm() {
-    Notification.requestPermission();
-    try { new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
-  }
+  const { isCritical, criticalReasons, permissionState, requestAlarmPermissions } = useCriticalAlarm(vital);
   const [doctors, setDoctors] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [note, setNote] = useState("");
@@ -209,7 +205,7 @@ function CareWorkspace({ role }) {
         isCritical={isCritical}
         criticalReasons={criticalReasons}
         permissionState={permissionState}
-        onAllow={handleAllowAlarm}
+        onAllow={requestAlarmPermissions}
       />
       <header className="care-header">
         <div><p>{role.toUpperCase()} PORTAL</p><h1>Patient monitoring</h1></div>
