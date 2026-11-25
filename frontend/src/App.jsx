@@ -10,9 +10,11 @@ import DoctorDashboard from "./pages/DoctorDashboard";
 import FamilyDashboard from "./pages/FamilyDashboard";
 import SharedMonitoring from "./pages/SharedMonitoring";
 import NurseDashboard from "./pages/NurseDashboard";
+import PatientKBot from "./components/PatientKBot";
 
 function App() {
   return (
+    <>
     <BrowserRouter>
       <Routes>
 
@@ -60,6 +62,8 @@ function App() {
 
       </Routes>
     </BrowserRouter>
+    <PatientKBot />
+    </>
   );
 }
 

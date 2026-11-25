@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import vitalRoutes from "./routes/vitalRoutes.js";
 import hardwareRoutes from "./routes/hardwareRoutes.js";
 import careRoutes from "./routes/careRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import Device from "./models/Device.js";
 
 dotenv.config();
@@ -23,9 +24,15 @@ const configuredOrigins = process.env.FRONTEND_URL
 const allowedOrigins = configuredOrigins.length
   ? [...new Set(["https://patientk.netlify.app", ...configuredOrigins])]
   : true;
+const localOriginPattern = /^https?:\/\/(localhost|127(?:\.\d{1,3}){3})(?::\d+)?$/i;
 const corsOptions = {
   origin: (requestOrigin, callback) => {
-    if (!requestOrigin || allowedOrigins === true || allowedOrigins.includes(requestOrigin)) {
+    if (
+      !requestOrigin ||
+      allowedOrigins === true ||
+      allowedOrigins.includes(requestOrigin) ||
+      localOriginPattern.test(requestOrigin)
+    ) {
       return callback(null, true);
     }
     return callback(null, false);
@@ -50,6 +57,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/vitals", vitalRoutes);
 app.use("/api/hardware", hardwareRoutes);
 app.use("/api/care", careRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
